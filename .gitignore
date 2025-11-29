@@ -2,3 +2,22 @@ exports/
 
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+env/
+
+# Driver y ejecutables
+chromedriver
+chromedriver.exe
+drivers/
+
+# Cookies y credenciales
+cookies.json
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

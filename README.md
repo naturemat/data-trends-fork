@@ -1,48 +1,81 @@
-# Instagram followers scraper
+Instagram Scraper – Benford Analysis
 
-This tool uses Python and [Selenium](http://www.seleniumhq.org/) to scrape the list of followers and people following a user and see the difference with a previously recorded list.
+Este proyecto es un scraper en Python que utiliza Selenium para obtener la cantidad de seguidores de los seguidores (o seguidos) de un usuario objetivo de Instagram.
+Luego aplica la Ley de Benford para estimar si dicha cuenta se comporta como un usuario real o un posible bot, basado en la distribución de los primeros dígitos.
 
-## Table of Contents
+Características
 
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [TODO](#todo)
+	Ingresa el usuario objetivo por consola.
+	Extrae seguidores o seguidos mediante Selenium.
+	Inicia sesión automáticamente usando cookies (si existen).
+	Si no hay cookies válidas, permite ingresar usuario y contraseña.
+	Obtiene seguidores de cada usuario listado.
+	Limpia, valida y tabula los datos.
+	Aplica Ley de Benford al dataset recolectado.
 
-## Requirements
+Genera:
 
-You need to have Python 3 and PIP installed. You can follow [these installation instructions](http://python-guide-pt-br.readthedocs.io/en/latest/starting/install/osx/). You also need to have Chrome installed as Selenium uses the `chromedriver` contained in the `drivers` folder.
+	Tabla general
+	Frecuencias de primeros dígitos
+	Gráfica comparativa
+	Conclusión automática (“real” o “bot”)
 
-Finally, you'll need your Instagram credentials to log in. At this time the dialog with the list of followers cannot be opened as an anonymous user.
+Estructura del proyecto
+instagram-scraper/
+│── modules/
+│   ├── scraper.py
+│   ├── utils.py
+│── drivers/
+│── main.py
+│── README.md
+│── requirements.txt
+│── .gitignore
+
+Requisitos
+
+	Python 3.8+
+	Google Chrome instalado
+	ChromeDriver compatible
+
+Instalación
+
+	Clona el repositorio:
+
+		git clone https://github.com/tu-usuario/instagram-scraper.git
+		cd instagram-scraper
 
 
-## Installation
+Instala dependencias:
 
-Download this project manually or clone the repo with git:
+	pip install -r requirements.txt
 
-```bash
-git clone git@github.com:frabonomi/instagram-followers-scraper.git
-```
 
-Then go to the directory and install the required dependencies
+Coloca tu chromedriver.exe dentro de la carpeta drivers/.
 
-```bash
-cd instagram-followers-scraper
-pip3 install -r requirements.txt
-```
+Crea un archivo cookies.json con tu sesión iniciada.
 
-## Usage
+Cómo ejecutar
 
-After installing the dependencies run the `main.py` file with Python 3:
+	Desde la raíz del proyecto:
+	python main.py
 
-```bash
-python3 main.py
-```
 
-You'll be asked to input the username that you want to analyze and your Instagram credentials. You can get info about followers, following or both. The data will be stored in the `exports` folder. 
+El programa pedirá:
 
-## TODO
+	El usuario objetivo
+	Si quieres analizar followers o following
+	Cargará cookies o pedirá login
+	Mostrará tabla
+	Mostrará gráfica
+	Entregará conclusión
 
-- Speed up scraping of the users. Right now scraping is quite slow and can be improved
-- Handle wrong credentials or missing username
-[![Run on Repl.it](https://repl.it/badge/github/tonoli/instagram-followers-scraper)](https://repl.it/github/tonoli/instagram-followers-scraper)
+Advertencia importante sobre Instagram
+
+	Instagram puede bloquear:
+	Acceso automatizado
+	Scraping excesivo
+	Inicios de sesión sospechosos
+	Uso de cookies de terceros
+
+Este proyecto es solo con fines educativos y de análisis.
+Úsalo únicamente en cuentas con permiso explícito.
