@@ -8,9 +8,6 @@ import sys
 
 
 def resource_path(relative_path):
-    """
-    Devuelve la ruta absoluta correcta tanto en .py como en .exe.
-    """
     if hasattr(sys, "_MEIPASS"):  # PyInstaller
         base_path = sys._MEIPASS
     else:
