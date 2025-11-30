@@ -74,43 +74,51 @@ class Scraper:
         print("\nObteniendo tendencias de X...")
         self.driver.get("https://x.com/explore/tabs/trending")
 
-        try:
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-        except:
-            print("Error cargando página.")
-            return []
+        WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
 
         time.sleep(3)
 
-        # SOLO TÍTULOS DE TENDENCIA (no subtítulos, no números)
-        elements = self.driver.find_elements(
-            By.XPATH, "//div[@data-testid='trend']//div[@dir='ltr']"
+        # Obtener cada contenedor de tendencia
+        trend_cards = self.driver.find_elements(
+            By.XPATH,
+            "//div[@data-testid='trend' and not(ancestor::*[@aria-label='Promoted'])]"
         )
 
-        raw = [e.text.strip() for e in elements if e.text.strip()]
-
         topics = []
-        for t in raw:
-            txt = t.lower()
+        for card in trend_cards:
+            # extraer todo el texto posible
+            txt = card.text.strip().lower()
 
-            #FILTROS DE BASURA
-            if (
-                "publicaciones" in txt or     # "15 mil publicaciones"
-                "tendencia" in txt or         # "Tendencia en Ecuador"
-                "mil" in txt or               # "15 mil"
-                txt.isdigit() or              # "4"
-                re.match(r"^\d+(mil)?$", txt) or  # "20", "20mil"
-                len(txt) <= 2                 # palabras como "en", "de", "y"
-            ):
+            # descartar anuncios aunque no estén en placementTracking
+            if any(bad in txt for bad in [
+                "promoted", "promocionado", "promoted by", "sponsored"
+            ]):
                 continue
 
-            topics.append(t)
+            # ahora extraemos solo el título
+            elems = card.find_elements(By.XPATH, ".//div[@dir='ltr']")
+            for e in elems:
+                t = e.text.strip()
+                lo = t.lower()
 
-        # Quitar duplicados manteniendo orden
+                if not t:
+                    continue
+
+                # filtros de basura
+                if (
+                    "publicaciones" in lo or
+                    "tendencia" in lo or
+                    lo.isdigit() or
+                    re.match(r"^\d+(mil)?$", lo) or
+                    len(lo) <= 2
+                ):
+                    continue
+
+                topics.append(t)
+
         final_topics = list(dict.fromkeys(topics))
-
         print(f"✔ {len(final_topics)} tendencias válidas encontradas.")
         return final_topics[:20]
 
