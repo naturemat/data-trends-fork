@@ -1,421 +1,125 @@
-import re
 import time
+from collections import Counter
+import re
 import json
-import os
-import random
 
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-
-class Scraper(object):
-    """Able to start up a browser, to authenticate to Instagram and get
-    followers and people following a specific user."""
+class Scraper:
 
     @staticmethod
     def create_driver(chromedriver_path):
         chrome_options = Options()
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument(
+            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
 
         service = Service(chromedriver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
+        # Evadir detección
         driver.execute_cdp_cmd(
             "Page.addScriptToEvaluateOnNewDocument",
-            {
-                "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-            },
+            {"source": "Object.defineProperty(navigator,'webdriver',{get:() => undefined})"}
         )
+
         return driver
 
-    @staticmethod
-    def load_simple_cookies_and_auth(driver, cookies_simple_json_path="cookies.json"):
-        """
-        Lee un JSON con una lista de cookies completas o un formato simple (dict).
-        Intenta añadirlas y verifica si la sesión se activa.
-        """
-        if not os.path.exists(cookies_simple_json_path):
-            return False
-
-        driver.get("https://www.instagram.com/")
-        time.sleep(2)
-
-        with open(cookies_simple_json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if isinstance(data, dict):
-            cookies = []
-            for name, value in data.items():
-                cookies.append(
-                    {
-                        "name": name,
-                        "value": value,
-                        "domain": ".instagram.com",
-                        "path": "/",
-                    }
-                )
-        elif isinstance(data, list):
-            cookies = data
-        else:
-            return False
-
-        for c in cookies:
-            try:
-                driver.add_cookie(c)
-            except Exception as e:
-                print(f"No se pudo añadir cookie {c.get('name')}: {e}")
-
-        driver.refresh()
-        time.sleep(3)
-
-        try:
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//nav"))
-            )
-            return True
-        except Exception:
-            return False
-
-    def __init__(self, target, chromedriver_path=None, cookies_path="cookies.json"):
-        self.target = target
-
+    def __init__(self, chromedriver_path, cookies_path=None):
         self.driver = self.create_driver(chromedriver_path)
+        self.cookies_path = cookies_path
 
-        cookies_loaded = False
-        try:
-            cookies_loaded = self.load_simple_cookies_and_auth(
-                self.driver, cookies_path
-            )
-        except Exception as e:
-            cookies_loaded = False
-
-        self._cookies_loaded = cookies_loaded
+        if cookies_path:
+            self.load_cookies()
 
     def close(self):
-        """Close the browser."""
+        self.driver.quit()
 
-        self.driver.close()
+    #CARGAR COOKIES (SESIÓN X)
+    def load_cookies(self):
+        try:
+            print("Cargando cookies...")
+            self.driver.get("https://x.com")
+            time.sleep(2)
 
-    def authenticate(self, username, password):
-        """Log in to Instagram with the provided credentials."""
+            with open(self.cookies_path, "r") as f:
+                cookies = json.load(f)
 
-        print("\nLogging in…")
-        self.driver.get("https://www.instagram.com")
+            for c in cookies:
+                self.driver.add_cookie(c)
 
-        WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "username"))
+            self.driver.refresh()
+            time.sleep(2)
+            print("Cookies cargadas.")
+        except:
+            print("No se pudieron cargar cookies.")
+
+    #SCRAPEAR TENDENCIAS
+    def get_trending_topics(self):
+        print("\nObteniendo tendencias de X...")
+        self.driver.get("https://x.com/explore/tabs/trending")
+
+        try:
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+        except:
+            print("Error cargando página.")
+            return []
+
+        time.sleep(3)
+
+        # SOLO TÍTULOS DE TENDENCIA (no subtítulos, no números)
+        elements = self.driver.find_elements(
+            By.XPATH, "//div[@data-testid='trend']//div[@dir='ltr']"
         )
 
-        username_input = self.driver.find_element(By.NAME, "username")
-        password_input = self.driver.find_element(By.NAME, "password")
+        raw = [e.text.strip() for e in elements if e.text.strip()]
 
-        username_input.send_keys(username)
-        password_input.send_keys(password)
-        password_input.send_keys(Keys.RETURN)
-        time.sleep(1)
+        topics = []
+        for t in raw:
+            txt = t.lower()
 
-    def get_users(self, group, verbose=False, max_scrolls=100, max_inactivity=10):
-        """
-        Obtiene todos los seguidores o seguidos haciendo scroll automático (versión más estable y completa).
-        """
-        link = self._get_link(group)
-        self._open_dialog(link)
-
-        print(f"Scrolleando {group} ...")
-
-        users = set()
-        last_height = 0
-        same_height_count = 0
-        scroll_count = 0
-        last_capture_time = time.time()
-        retries = 0
-
-        while True:
-            scroll_count += 1
-
-            # Scroll gradual en vez de saltar al final
-            self.driver.execute_script(
-                """
-                const dialog = document.querySelector('div[role="dialog"]');
-                if (!dialog) return;
-                const divs = dialog.querySelectorAll('div');
-                for (let div of divs) {
-                    if (div.scrollHeight > div.clientHeight * 1.2) {
-                        div.scrollTop = div.scrollTop + div.clientHeight;
-                        break;
-                    }
-                }
-            """
-            )
-
-            # Espera aleatoria más humana
-            time.sleep(random.uniform(2.5, 4.0))
-
-            # Reobtener el contenedor cada vez
-            scroll_box = self.users_list_container
-            links = scroll_box.find_elements(By.XPATH, ".//a[contains(@href, '/')]")
-
-            new_users = 0
-            for link in links:
-                username = link.text.strip()
-                if username and username not in users:
-                    users.add(username)
-                    new_users += 1
-                    if verbose:
-                        print(f" {username}")
-
-            if new_users > 0:
-                last_capture_time = time.time()
-                retries = 0
-            else:
-                retries += 1
-
-            inactivity_time = time.time() - last_capture_time
-            if inactivity_time > max_inactivity:
-                if retries < 3:
-                    print(
-                        f"No hay nuevos usuarios, reintentando scroll ({retries}/3)..."
-                    )
-                    time.sleep(3)
-                    continue
-                else:
-                    print(
-                        "No se detectan nuevas peticiones, scroll detenido definitivamente."
-                    )
-                    break
-
-            current_height = self.driver.execute_script(
-                """
-                const dialog = document.querySelector('div[role="dialog"]');
-                if (!dialog) return 0;
-                const divs = dialog.querySelectorAll('div');
-                for (let div of divs) {
-                    if (div.scrollHeight > div.clientHeight * 1.2) return div.scrollHeight;
-                }
-                return 0;
-            """
-            )
-
-            if current_height == last_height:
-                same_height_count += 1
-            else:
-                same_height_count = 0
-                last_height = current_height
-
-            if same_height_count >= 5:
-                print("Scroll parece detenido visualmente, intentando reactivar...")
-                time.sleep(3)
-                same_height_count = 0
-
-            if scroll_count > max_scrolls:
-                print("Límite máximo de scroll alcanzado.")
-                break
-        return list(users)
-
-    def _get_link(self, group):
-        """Return the element linking to the users list dialog (layout 2025)."""
-        print(f"\nNavigating to {self.target} profile…")
-        self.driver.get(f"https://www.instagram.com/{self.target}/")
-
-        try:
-            WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, "//header"))
-            )
-
-            possible_links = self.driver.find_elements(
-                By.XPATH,
-                "//header//a[contains(@href,'/followers') or contains(@href,'/following') or contains(@href,'/seguidos') or contains(@href,'/seguidores')]",
-            )
-
-            if not possible_links:
-                possible_links = self.driver.find_elements(
-                    By.XPATH,
-                    "//header//div[@role='link' or @role='button'] | //header//span",
-                )
-
-            if not possible_links:
-                raise Exception(
-                    "No se encontraron elementos clicables para seguidores/seguidos."
-                )
-
-            group = group.lower()
-            target_el = None
-
-            for el in possible_links:
-                text = el.text.strip().lower()
-                if (
-                    ("followers" in text and group == "followers")
-                    or ("following" in text and group == "following")
-                    or ("seguidores" in text and group == "followers")
-                    or ("seguidos" in text and group == "following")
-                ):
-                    target_el = el
-                    break
-
-            if not target_el:
-                for el in possible_links:
-                    href = el.get_attribute("href") or ""
-                    if ("/followers" in href and group == "followers") or (
-                        "/following" in href and group == "following"
-                    ):
-                        target_el = el
-                        break
-
-            if not target_el:
-                raise Exception(
-                    f"No se encontró enlace de '{group}' en el perfil actual."
-                )
-
-            return target_el
-
-        except Exception as e:
-            print(f"Error buscando el enlace de '{group}': {e}")
-            return None
-
-    def _open_dialog(self, link):
-        if link is None:
-            raise Exception("No se pudo abrir el diálogo: enlace no encontrado.")
-
-        link.click()
-
-        try:
-            WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@role='dialog']"))
-            )
-        except:
-            raise Exception(
-                "No se detectó ningún diálogo emergente después de hacer clic."
-            )
-
-        try:
-            self.users_list_container = WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[@role='dialog']//div[contains(@class,'_aano')]")
-                )
-            )
-        except:
-            try:
-                self.users_list_container = WebDriverWait(self.driver, 15).until(
-                    EC.presence_of_element_located(
-                        (By.XPATH, "//div[@role='dialog']//div[@class]")
-                    )
-                )
-            except:
-                raise Exception(
-                    "No se encontró el contenedor de la lista de usuarios en el diálogo."
-                )
-
-    def get_followers_count(self, usernames, delay_range=(2, 4)):
-        results = {}
-        number_re = re.compile(r"([\d,.]+)")
-
-        for i, username in enumerate(usernames, 1):
-            url = f"https://www.instagram.com/{username}/"
-            try:
-                self.driver.get(url)
-                WebDriverWait(self.driver, 15).until(
-                    EC.presence_of_element_located((By.XPATH, "//header"))
-                )
-            except Exception as e:
-                print(f"{username}: header no cargó: {e}")
-                results[username] = "N/A"
-                time.sleep(random.uniform(*delay_range))
+            #FILTROS DE BASURA
+            if (
+                "publicaciones" in txt or     # "15 mil publicaciones"
+                "tendencia" in txt or         # "Tendencia en Ecuador"
+                "mil" in txt or               # "15 mil"
+                txt.isdigit() or              # "4"
+                re.match(r"^\d+(mil)?$", txt) or  # "20", "20mil"
+                len(txt) <= 2                 # palabras como "en", "de", "y"
+            ):
                 continue
 
-            followers_count = None
+            topics.append(t)
 
-            try:
-                follower_link = self.driver.find_element(
-                    By.XPATH, "//a[contains(@href,'/followers')]"
-                )
-                raw = (
-                    follower_link.get_attribute("title")
-                    or follower_link.get_attribute("aria-label")
-                    or follower_link.text
-                )
-                if raw:
-                    m = number_re.search(raw)
-                    if m:
-                        followers_count = m.group(1).replace(",", "").replace(".", "")
-            except NoSuchElementException:
-                pass
-            except Exception:
-                pass
+        # Quitar duplicados manteniendo orden
+        final_topics = list(dict.fromkeys(topics))
 
-            if not followers_count:
-                try:
-                    meta = self.driver.find_element(
-                        By.XPATH, "//meta[@name='description']"
-                    )
-                    content = meta.get_attribute("content") or ""
-                    m = number_re.search(content)
-                    if m:
-                        followers_count = m.group(1).replace(",", "").replace(".", "")
-                except Exception:
-                    pass
+        print(f"✔ {len(final_topics)} tendencias válidas encontradas.")
+        return final_topics[:20]
 
-            if not followers_count:
-                try:
-                    raw_json = self.driver.execute_script(
-                        "return (window._sharedData || window.__initialData || null);"
-                    )
-                    if raw_json:
-                        js_str = str(raw_json)
-                        idx = js_str.lower().find("followers")
-                        if idx != -1:
-                            snippet = js_str[max(0, idx - 120) : idx + 120]
-                            m = number_re.search(snippet)
-                            if m:
-                                followers_count = (
-                                    m.group(1).replace(",", "").replace(".", "")
-                                )
-                    if not followers_count:
-                        try:
-                            ld = self.driver.find_element(
-                                By.XPATH, "//script[@type='application/ld+json']"
-                            )
-                            ld_text = ld.get_attribute("innerText") or ""
-                            m = number_re.search(ld_text)
-                            if m:
-                                followers_count = (
-                                    m.group(1).replace(",", "").replace(".", "")
-                                )
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+    #ANALIZAR PALABRAS MÁS USADAS
+    def count_words_in_trends(self, topics):
+        print("\nContando palabras en tendencias...")
 
-            if not followers_count:
-                try:
-                    time.sleep(1)
-                    follower_link = self.driver.find_element(
-                        By.XPATH, "//a[contains(@href,'/followers')]"
-                    )
-                    raw = (
-                        follower_link.get_attribute("title")
-                        or follower_link.get_attribute("aria-label")
-                        or follower_link.text
-                    )
-                    if raw:
-                        m = number_re.search(raw)
-                        if m:
-                            followers_count = (
-                                m.group(1).replace(",", "").replace(".", "")
-                            )
-                except Exception:
-                    pass
+        text = " ".join(topics).lower()
+        text = re.sub(r"[^a-z0-9áéíóúñ#]", " ", text)
+        words = text.split()
 
-            results[username] = followers_count or "N/A"
-
-            time.sleep(random.uniform(1.5, 2.5))
-
-        return results
+        return Counter(words).most_common(20)
