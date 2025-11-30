@@ -2,13 +2,27 @@ import math
 import matplotlib.pyplot as plt
 import pandas as pd
 from collections import Counter
-
 from modules.scraper import Scraper
+import os
+import sys
+
+
+def resource_path(relative_path):
+    """
+    Devuelve la ruta absoluta correcta tanto en .py como en .exe.
+    """
+    if hasattr(sys, "_MEIPASS"):  # PyInstaller
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+    return os.path.join(base_path, relative_path)
+
 
 def plot_word_frequencies(words_counts):
     palabras, cuentas = zip(*words_counts)
-    plt.figure(figsize=(12,6))
-    plt.bar(palabras, cuentas, color='skyblue')
+    plt.figure(figsize=(12, 6))
+    plt.bar(palabras, cuentas, color="skyblue")
     plt.title("Palabras más frecuentes en tendencias de X")
     plt.xlabel("Palabras")
     plt.ylabel("Frecuencia")
@@ -17,9 +31,10 @@ def plot_word_frequencies(words_counts):
     plt.tight_layout()
     plt.show()
 
+
 def main():
-    chromedriver_path = r"D:\Usuario\Documentos\U\SEMESTRE_6\Desarrollo\x-scraper\drivers\chromedriver.exe"  # Cambia la ruta a tu chromedriver
-    cookies_path = r"D:\Usuario\Documentos\U\SEMESTRE_6\Desarrollo\x-scraper\cookies.json" # Cambia la ruta a tu archivo de cookies
+    chromedriver_path = resource_path(os.path.join("drivers", "chromedriver.exe"))
+    cookies_path = resource_path("cookies.json")
 
     scraper = Scraper(chromedriver_path=chromedriver_path, cookies_path=cookies_path)
 
@@ -49,6 +64,7 @@ def main():
     plot_word_frequencies(word_counts)
 
     scraper.close()
+
 
 if __name__ == "__main__":
     main()
