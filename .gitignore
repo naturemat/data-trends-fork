@@ -21,3 +21,6 @@ cookies.json
 # Archivos del sistema
 .DS_Store
 Thumbs.db
+
+#Archivo que almacena las tendencias
+palabras_tendencias.csv

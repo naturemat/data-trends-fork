@@ -1,27 +1,15 @@
-Instagram Scraper – Benford Analysis
+# X Trends Scraper
 
-Este proyecto es un scraper en Python que utiliza Selenium para obtener la cantidad de seguidores de los seguidores (o seguidos) de un usuario objetivo de Instagram.
-Luego aplica la Ley de Benford para estimar si dicha cuenta se comporta como un usuario real o un posible bot, basado en la distribución de los primeros dígitos.
+Este proyecto es un scraper en Python que utiliza Selenium para obtener las tendencias (topics, hashtags, o temas populares) actuales en X (antes Twitter). 
 
-Características
+## Características
 
-	Ingresa el usuario objetivo por consola.
-	Extrae seguidores o seguidos mediante Selenium.
-	Inicia sesión automáticamente usando cookies (si existen).
-	Si no hay cookies válidas, permite ingresar usuario y contraseña.
-	Obtiene seguidores de cada usuario listado.
-	Limpia, valida y tabula los datos.
-	Aplica Ley de Benford al dataset recolectado.
+* Extrae las tendencias actuales de X automáticamente con Selenium.
+* Limpia, valida y estructura los datos obtenidos.
+* Genera reportes con las tendencias recolectadas para análisis.
 
-Genera:
-
-	Tabla general
-	Frecuencias de primeros dígitos
-	Gráfica comparativa
-	Conclusión automática (“real” o “bot”)
-
-Estructura del proyecto
-instagram-scraper/
+## Estructura del proyecto
+x-trends-scraper/
 │── modules/
 │   ├── scraper.py
 │   ├── utils.py
@@ -31,51 +19,33 @@ instagram-scraper/
 │── requirements.txt
 │── .gitignore
 
-Requisitos
+## Requisitos
 
-	Python 3.8+
-	Google Chrome instalado
-	ChromeDriver compatible
+* Python 3.8+
+* Google Chrome instalado
+* ChromeDriver compatible con tu versión de Chrome
 
-Instalación
+## Instalación
 
-	Clona el repositorio:
+Clona el repositorio:
 
-		git clone https://github.com/tu-usuario/instagram-scraper.git
-		cd instagram-scraper
+git clone https://github.com/tu-usuario/x-trends-scraper.git
+cd x-trends-scraper
 
+Instala las dependencias:
 
-Instala dependencias:
+pip install -r requirements.txt
 
-	pip install -r requirements.txt
+Coloca tu `chromedriver.exe` dentro de la carpeta `drivers/`.
 
+## Cómo ejecutar
 
-Coloca tu chromedriver.exe dentro de la carpeta drivers/.
+Desde la raíz del proyecto ejecuta:
 
-Crea un archivo cookies.json con tu sesión iniciada.
+python main.py
 
-Cómo ejecutar
+## Advertencias importantes sobre scraping en X
 
-	Desde la raíz del proyecto:
-	python main.py
-
-
-El programa pedirá:
-
-	El usuario objetivo
-	Si quieres analizar followers o following
-	Cargará cookies o pedirá login
-	Mostrará tabla
-	Mostrará gráfica
-	Entregará conclusión
-
-Advertencia importante sobre Instagram
-
-	Instagram puede bloquear:
-	Acceso automatizado
-	Scraping excesivo
-	Inicios de sesión sospechosos
-	Uso de cookies de terceros
-
-Este proyecto es solo con fines educativos y de análisis.
-Úsalo únicamente en cuentas con permiso explícito.
+* X puede bloquear o limitar accesos automatizados.
+* Evita hacer scraping excesivo para no ser bloqueado.
+* Respeta los términos de servicio de X y usa este proyecto solo con fines educativos o análisis autorizado.
