@@ -1,63 +1,77 @@
 import os
 import sys
-import pandas as pd
+import logging
 from datetime import datetime
+import pandas as pd
+
 from modules.scraper import Scraper
 
 
+# ============================================================
+# CONFIG LOGGING
+# ============================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+
+log = logging.getLogger("Runner")
+
+
+# ============================================================
+# UTILIDADES
+# ============================================================
 def resource_path(relative_path):
-    if hasattr(sys, "_MEIPASS"):
+    if hasattr(sys, "_MEIPASS"):  # PyInstaller
         base_path = sys._MEIPASS
     else:
         base_path = os.path.dirname(os.path.abspath(__file__))
-
     return os.path.join(base_path, relative_path)
 
 
 def save_csv(trends, output_path):
     now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
-    hour = now.strftime("%H:%M:%S")
-
-    df_new = pd.DataFrame({
-        "Fecha": [today] * len(trends),
-        "Hora": [hour] * len(trends),
-        "Tendencia": trends
+    df = pd.DataFrame({
+        "fecha": [now.strftime("%Y-%m-%d")] * len(trends),
+        "hora": [now.strftime("%H:%M:%S")] * len(trends),
+        "tendencia": trends
     })
 
-    # Si el archivo ya existe → agregar sin cabecera
     if os.path.exists(output_path):
-        df_new.to_csv(output_path, mode="a", header=False, index=False)
+        df.to_csv(output_path, mode="a", header=False, index=False)
     else:
-        df_new.to_csv(output_path, index=False)
+        df.to_csv(output_path, index=False)
 
-    print(f"✔ Tendencias guardadas en CSV: {output_path}")
+    log.info(f"Tendencias guardadas en {output_path}")
 
+
+# ============================================================
+# RUNNER PRINCIPAL
+# ============================================================
 def run_scraper():
+    log.info("Iniciando scraper...")
+
     chromedriver_path = resource_path(os.path.join("drivers", "chromedriver.exe"))
     cookies_path = resource_path("cookies.json")
 
-    print("Iniciando scraper...\n")
-
-    scraper = Scraper(chromedriver_path=chromedriver_path, cookies_path=cookies_path)
+    scraper = Scraper(chromedriver_path, cookies_path)
 
     try:
-        # Obtener tendencias
         trends = scraper.get_trending_topics()
 
         if not trends:
-            print("No se obtuvieron tendencias (posible problema de cookies/login).")
+            log.warning("No se obtuvieron tendencias (posibles cookies inválidas).")
             return
 
-        print("\nTendencias obtenidas:")
-        for i, t in enumerate(trends, start=1):
+        log.info("Tendencias obtenidas:")
+        for i, t in enumerate(trends, 1):
             print(f"{i}. {t}")
 
-        # Guardar CSV (ruta local)
+        # Guardado temporal en CSV (antes de integrar DB)
         output_path = os.path.join(os.path.dirname(__file__), "tendencias.csv")
         save_csv(trends, output_path)
 
-        print("\n✔ Finalizado correctamente.\n")
+        log.info("Proceso completado con éxito.")
 
     finally:
         scraper.close()
