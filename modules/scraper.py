@@ -1,7 +1,8 @@
 import time
-from collections import Counter
-import re
 import json
+import re
+import logging
+from collections import Counter
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,16 +11,40 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-class Scraper:
 
-    @staticmethod
-    def create_driver(chromedriver_path):
+class Scraper:
+    """
+    Clase encargada de obtener tendencias de X (Twitter).
+    Posee:
+      ✔ Headless mode para servidores
+      ✔ Anti-detección webdriver
+      ✔ Logging profesional
+      ✔ Limpieza modular y testeable
+    """
+
+    def __init__(self, chromedriver_path, cookies_path=None):
+        self.log = logging.getLogger("Scraper")
+        self.driver = self._create_driver(chromedriver_path)
+        self.cookies_path = cookies_path
+
+        if cookies_path:
+            self.load_cookies()
+
+    # ============================================================
+    # DRIVER SETUP
+    # ============================================================
+    def _create_driver(self, chromedriver_path):
         chrome_options = Options()
-        chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+
+        # HEADLESS en servidores (Jenkins, EC2, Docker)
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--window-size=1920,1080")
+
         chrome_options.add_argument(
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -32,102 +57,120 @@ class Scraper:
         service = Service(chromedriver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # Evadir detección
+        # Anti-detección webdriver=true
         driver.execute_cdp_cmd(
             "Page.addScriptToEvaluateOnNewDocument",
-            {"source": "Object.defineProperty(navigator,'webdriver',{get:() => undefined})"}
+            {"source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                })
+            """}
         )
 
+        self.log.info("Driver inicializado en modo headless.")
         return driver
 
-    def __init__(self, chromedriver_path, cookies_path=None):
-        self.driver = self.create_driver(chromedriver_path)
-        self.cookies_path = cookies_path
-
-        if cookies_path:
-            self.load_cookies()
-
+    # ============================================================
+    # MÉTODOS AUXILIARES
+    # ============================================================
     def close(self):
+        self.log.info("Cerrando driver...")
         self.driver.quit()
 
-    #CARGAR COOKIES (SESIÓN X)
     def load_cookies(self):
+        self.log.info("Cargando cookies desde archivo...")
+
         try:
-            print("Cargando cookies...")
             self.driver.get("https://x.com")
             time.sleep(2)
 
-            with open(self.cookies_path, "r") as f:
+            with open(self.cookies_path, "r", encoding="utf-8") as f:
                 cookies = json.load(f)
 
             for c in cookies:
-                self.driver.add_cookie(c)
+                try:
+                    self.driver.add_cookie(c)
+                except Exception:
+                    pass  # cookies inválidas son normales
 
             self.driver.refresh()
-            time.sleep(2)
-            print("Cookies cargadas.")
-        except:
-            print("No se pudieron cargar cookies.")
+            self.log.info("Cookies cargadas correctamente.")
 
-    #SCRAPEAR TENDENCIAS
+        except Exception as e:
+            self.log.error(f"Error al cargar cookies: {e}")
+
+    # ============================================================
+    # SCRAPING PRINCIPAL
+    # ============================================================
     def get_trending_topics(self):
-        print("\nObteniendo tendencias de X...")
+        self.log.info("Obteniendo tendencias desde X...")
         self.driver.get("https://x.com/explore/tabs/trending")
 
-        WebDriverWait(self.driver, 10).until(
+        WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
 
         time.sleep(3)
 
-        # Obtener cada contenedor de tendencia
-        trend_cards = self.driver.find_elements(
+        cards = self.driver.find_elements(
             By.XPATH,
             "//div[@data-testid='trend' and not(ancestor::*[@aria-label='Promoted'])]"
         )
 
-        topics = []
-        for card in trend_cards:
-            # extraer todo el texto posible
-            txt = card.text.strip().lower()
+        raw_topics = []
+        for card in cards:
+            extracted = self._extract_topics_from_card(card)
+            raw_topics.extend(extracted)
 
-            # descartar anuncios aunque no estén en placementTracking
-            if any(bad in txt for bad in [
-                "promoted", "promocionado", "promoted by", "sponsored"
-            ]):
-                continue
+        # Eliminar duplicados manteniendo orden
+        final_topics = list(dict.fromkeys(raw_topics))
+        self.log.info(f"{len(final_topics)} tendencias válidas obtenidas.")
 
-            # ahora extraemos solo el título
-            elems = card.find_elements(By.XPATH, ".//div[@dir='ltr']")
-            for e in elems:
-                t = e.text.strip()
-                lo = t.lower()
-
-                if not t:
-                    continue
-
-                # filtros de basura
-                if (
-                    "publicaciones" in lo or
-                    "tendencia" in lo or
-                    lo.isdigit() or
-                    re.match(r"^\d+(mil)?$", lo) or
-                    len(lo) <= 2
-                ):
-                    continue
-
-                topics.append(t)
-
-        final_topics = list(dict.fromkeys(topics))
-        print(f"✔ {len(final_topics)} tendencias válidas encontradas.")
         return final_topics[:20]
 
-    #ANALIZAR PALABRAS MÁS USADAS
+    # ============================================================
+    # FUNCIONES PRIVADAS
+    # ============================================================
+    def _extract_topics_from_card(self, card):
+        """Extrae candidatos y filtra basura."""
+        text = card.text.strip().lower()
+
+        # descartar anuncios
+        if any(w in text for w in ["promoted", "promocionado", "sponsored"]):
+            return []
+
+        elems = card.find_elements(By.XPATH, ".//div[@dir='ltr']")
+        topics = []
+
+        for e in elems:
+            t = e.text.strip()
+            lo = t.lower()
+
+            if not t:
+                continue
+
+            # filtros
+            if (
+                "publicaciones" in lo or
+                "tendencia" in lo or
+                lo.isdigit() or
+                re.match(r"^\d+(mil)?$", lo) or
+                len(lo) <= 2
+            ):
+                continue
+
+            topics.append(t)
+
+        return topics
+
+    # ============================================================
+    # ANÁLISIS DE PALABRAS
+    # ============================================================
     def count_words_in_trends(self, topics):
-        print("\nContando palabras en tendencias...")
+        self.log.info("Contando palabras en tendencias...")
 
         text = " ".join(topics).lower()
         text = re.sub(r"[^a-z0-9áéíóúñ#]", " ", text)
-        words = text.split()
 
+        words = text.split()
         return Counter(words).most_common(20)
