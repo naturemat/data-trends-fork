@@ -1,1 +1,1 @@
-#funciones de acceso (save/get)
+# funciones save/get usadas por scraper y API

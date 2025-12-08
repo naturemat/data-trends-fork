@@ -1,1 +1,1 @@
-#Conexion a SQLAlchemy
+# conexión SQLAlchemy

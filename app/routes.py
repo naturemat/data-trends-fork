@@ -1,1 +1,1 @@
-#Aqui va los endpoints de la aplicacion Flask
+# endpoints manejadas por Flask
