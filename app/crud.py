@@ -1,0 +1,1 @@
+# funciones save/get usadas por scraper y API
