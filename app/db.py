@@ -17,6 +17,9 @@ engine = create_engine(
     pool_pre_ping=True
 )
 
+# Alias para compatibilidad
+_engine = engine
+
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
@@ -26,8 +29,14 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+
+def get_session():
+    """Retorna una sesión de SQLAlchemy."""
+    return SessionLocal()
+
+
 def get_db():
-    """Genera una sesión para usar dentro de las rutas"""
+    """Generador de sesión para usar en rutas con contexto."""
     db = SessionLocal()
     try:
         yield db
