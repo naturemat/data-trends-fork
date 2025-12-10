@@ -6,6 +6,7 @@ __pycache__/
 *.pyd
 
 # Entornos virtuales
+.env
 venv/
 env/
 
@@ -17,6 +18,10 @@ drivers/
 # Cookies y credenciales
 cookies.json
 *.log
+
+# Archivos temporales
+*.tmp
+*.swp
 
 # Archivos del sistema
 .DS_Store
