@@ -4,7 +4,10 @@ import logging
 from datetime import datetime
 import pandas as pd
 
-from modules.scraper import Scraper
+from scrapy.crawler import CrawlerProcess
+from scrapy.utils.project import get_project_settings
+
+from modules.scraper import scraper
 
 
 # ============================================================
@@ -14,7 +17,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-
 log = logging.getLogger("Runner")
 
 
@@ -30,13 +32,17 @@ def resource_path(relative_path):
 
 
 def save_csv(trends, output_path):
-    now = datetime.now()
-    df = pd.DataFrame({
-        "fecha": [now.strftime("%Y-%m-%d")] * len(trends),
-        "hora": [now.strftime("%H:%M:%S")] * len(trends),
-        "tendencia": trends
-    })
+    now = datetime.now().strftime("%Y-%m-%d")
+    hour = datetime.now().strftime("%H:%M:%S")
 
+    # Convertimos a DataFrame correctamente
+    df = pd.DataFrame(trends)
+
+    # Añadimos las columnas de fecha y hora
+    df.insert(0, "fecha", now)
+    df.insert(1, "hora", hour)
+
+    # Guardamos como columnas verdaderas
     if os.path.exists(output_path):
         df.to_csv(output_path, mode="a", header=False, index=False)
     else:
@@ -51,30 +57,32 @@ def save_csv(trends, output_path):
 def run_scraper():
     log.info("Iniciando scraper...")
 
-    chromedriver_path = resource_path(os.path.join("drivers", "chromedriver.exe"))
-    cookies_path = resource_path("cookies.json")
+    # Contenedor donde se guardarán los resultados del spider
+    collected = []
 
-    scraper = Scraper(chromedriver_path, cookies_path)
+    # El spider recibirá este contenedor para llenar tendencias
+    scraper.collected = collected
 
-    try:
-        trends = scraper.get_trending_topics()
+    settings = get_project_settings()
+    process = CrawlerProcess(settings)
 
-        if not trends:
-            log.warning("No se obtuvieron tendencias (posibles cookies inválidas).")
-            return
+    process.crawl(scraper)
+    process.start()  # Bloquea hasta que el spider termina
 
-        log.info("Tendencias obtenidas:")
-        for i, t in enumerate(trends, 1):
-            print(f"{i}. {t}")
+    trends = collected
 
-        # Guardado temporal en CSV (antes de integrar DB)
-        output_path = os.path.join(os.path.dirname(__file__), "tendencias.csv")
-        save_csv(trends, output_path)
+    if not trends:
+        log.warning("No se obtuvieron tendencias.")
+        return
 
-        log.info("Proceso completado con éxito.")
+    log.info("Tendencias obtenidas:")
+    for i, t in enumerate(trends, 1):
+        print(f"{i}. {t}")
 
-    finally:
-        scraper.close()
+    output_path = os.path.join(os.path.dirname(__file__), "tendencias.csv")
+    save_csv(trends, output_path)
+
+    log.info("Proceso completado con éxito.")
 
 
 if __name__ == "__main__":

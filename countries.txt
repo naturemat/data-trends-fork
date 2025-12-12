@@ -1,0 +1,20 @@
+worldwide
+australia
+brazil
+canada
+france
+germany
+india
+japan
+netherlands
+peru
+russia
+sweden
+switzerland
+united kingdom
+united states
+ecuador
+argentina
+mexico
+colombia
+spain

@@ -10,15 +10,6 @@ __pycache__/
 venv/
 env/
 
-# Driver y ejecutables
-chromedriver
-chromedriver.exe
-drivers/
-
-# Cookies y credenciales
-cookies.json
-*.log
-
 # Archivos temporales
 *.tmp
 *.swp
