@@ -20,3 +20,9 @@ Thumbs.db
 
 #Archivo que almacena las tendencias
 tendencias.csv
+
+#Archivos para subir a AWS
+temp_deploy/*
+
+# Llaves 
+*.pem

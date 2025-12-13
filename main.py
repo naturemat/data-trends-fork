@@ -8,6 +8,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 
 from modules.scraper import scraper
+from app.crud import save_scraped_trends  # Nueva integración con MongoDB
 
 
 # ============================================================
@@ -52,9 +53,23 @@ def save_csv(trends, output_path):
 
 
 # ============================================================
+# INTEGRACIÓN CON MONGODB
+# ============================================================
+def save_to_database(trends):
+    """Guarda las tendencias en MongoDB."""
+    try:
+        count = save_scraped_trends(trends)
+        log.info(f"{count} tendencias guardadas en MongoDB")
+        return count
+    except Exception as e:
+        log.error(f"Error guardando en MongoDB: {e}")
+        return 0
+
+
+# ============================================================
 # RUNNER PRINCIPAL
 # ============================================================
-def run_scraper():
+def run_scraper(save_to_db=True):
     log.info("Iniciando scraper...")
 
     # Contenedor donde se guardarán los resultados del spider
@@ -79,6 +94,13 @@ def run_scraper():
     for i, t in enumerate(trends, 1):
         print(f"{i}. {t}")
 
+    # Guardar en MongoDB (nueva funcionalidad)
+    if save_to_db:
+        db_count = save_to_database(trends)
+        if db_count > 0:
+            log.info("Datos guardados exitosamente en la base de datos")
+
+    # Guardar en CSV (funcionalidad existente)
     output_path = os.path.join(os.path.dirname(__file__), "tendencias.csv")
     save_csv(trends, output_path)
 
