@@ -408,3 +408,43 @@ details ul {
     opacity: 1;
 }
 
+.ai-response {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #2563eb;
+    border-radius: 5px;
+    background-color: #f0f4ff;
+    white-space: pre-line;
+}
+
+/* Tarjeta de respuesta de la IA */
+.ai-response {
+    margin-top: 15px;
+    padding: 15px 20px;
+    border-radius: 10px;
+    background-color: #f3f4f6; /* gris claro */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    color: #111827; /* texto oscuro */
+    font-size: 0.95rem;
+    line-height: 1.5;
+    display: none; /* por defecto oculta */
+}
+
+.ai-response.visible {
+    display: block;
+}
+
+/* Botón de analizar IA */
+#analyzeBtn {
+    margin-left: 10px;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+#analyzeBtn:hover {
+    background-color: #1d4ed8;
+}
