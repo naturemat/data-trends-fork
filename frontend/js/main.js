@@ -11,6 +11,10 @@ let endDate = null;
 let startTime = null;
 let endTime = null;
 
+let aiModal;
+let aiSummary;
+let closeModal;
+
 const countryMap = {
     worldwide: "Global",
     australia: "Australia",
@@ -104,8 +108,51 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("Filtros eliminados");
     });
 
+    aiModal = document.getElementById("aiModal");
+    aiSummary = document.getElementById("aiSummary");
+    closeModal = document.getElementById("closeModal");
+
+    closeModal.addEventListener("click", () => {
+        aiModal.classList.add("hidden");
+    });
+
+    aiModal.addEventListener("click", (e) => {
+        if (e.target === aiModal) {
+            aiModal.classList.add("hidden");
+        }
+    });
+
+    document.getElementById("analyzeBtn").addEventListener("click", async () => {
+        const filteredData = getFilteredDataForAI();
+
+        if (!filteredData.length) {
+            showToast("No hay datos filtrados para analizar");
+            return;
+        }
+
+        aiSummary.textContent = "🤖 Analizando tendencias...";
+        aiModal.classList.remove("hidden");
+
+        try {
+            const res = await fetch(`${API_BASE}/ai_summary`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ data: filteredData })
+            });
+
+            const result = await res.json();
+            aiSummary.textContent = result.summary || "No se pudo generar el resumen";
+
+        } catch (err) {
+            console.error(err);
+            aiSummary.textContent = "Error generando resumen con IA";
+        }
+    });
+
     setupTabs();
 });
+
+
 
 // =======================================
 // CARGA DE DATOS DESDE API
@@ -405,5 +452,9 @@ function validateDateTimeFilters(startDate, startTime, endDate, endTime) {
         return false;
     }
     return true;
+}
+
+function getFilteredDataForAI() {
+    return filterByDateTime([...allData]);
 }
 
