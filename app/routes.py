@@ -1,7 +1,7 @@
 """Flask route handlers for trends API."""
 
 from flask import Blueprint, request, jsonify
-from app.crud import create_trend, get_trends, get_trends_by_country, save_scraped_trends
+from app.crud import create_trend, get_trends, get_trends_by_country, get_trends_by_date_range, save_scraped_trends
 
 routes_blueprint = Blueprint("routes", __name__)
 
