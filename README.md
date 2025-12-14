@@ -68,6 +68,12 @@ x-trends-scraper/
 4. **Configura el scraper:**
    - Asegúrate de que `countries.txt` existe con la lista de países
 
+5. **Configura el API Key de Groq**
+   - Actualiza `.env` con tu API Key de Groq
+     ```
+     GROQCLOUD_API_KEY=API_KEY
+     ```
+
 ## Cómo usar
 
 ### 1. Ejecutar el scraper (guarda en MongoDB + CSV)
