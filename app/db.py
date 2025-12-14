@@ -1,44 +1,29 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from pymongo import MongoClient
+from pymongo.database import Database
 
-load_dotenv()  # Lee .env desde la raíz del proyecto
+load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL no está definido en el archivo .env")
+MONGODB_URL = os.getenv("MONGODB_URL")
+if not MONGODB_URL:
+    raise RuntimeError("MONGODB_URL no está definido en el archivo .env")
 
-# Motor SQLAlchemy (singleton)
-engine = create_engine(
-    DATABASE_URL,
-    future=True,
-    echo=False,
-    pool_pre_ping=True
-)
+# Cliente MongoDB (singleton)
+client = MongoClient(MONGODB_URL)
+
+# Base de datos
+db: Database = client.get_database()
 
 # Alias para compatibilidad
-_engine = engine
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-    future=True
-)
-
-Base = declarative_base()
+_database = db
 
 
-def get_session():
-    """Retorna una sesión de SQLAlchemy."""
-    return SessionLocal()
+def get_database():
+    """Retorna la base de datos MongoDB."""
+    return db
 
 
-def get_db():
-    """Generador de sesión para usar en rutas con contexto."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def close_connection():
+    """Cierra la conexión a MongoDB."""
+    client.close()

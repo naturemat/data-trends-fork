@@ -11,8 +11,8 @@ peru
 russia
 sweden
 switzerland
-united kingdom
-united states
+united-kingdom
+united-states
 ecuador
 argentina
 mexico
