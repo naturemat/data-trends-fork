@@ -1,3 +1,7 @@
+// =======================================
+// main.js - Dashboard de Tendencias
+// =======================================
+
 let allData = [];
 let trendsChart = null;
 let countryChart = null;
@@ -25,8 +29,17 @@ const countryMap = {
     argentina: "Argentina",
     mexico: "México",
     colombia: "Colombia",
-    spain: "España"
+    spain: "España",
+    "united-kingdom": "Reino Unido",
+    "united-states": "Estados Unidos"
 };
+
+
+// Detecta si estamos en local o en producción
+const API_URL = "http://127.0.0.1:5000";
+
+// URL base de la API (ajusta según si es local o EC2)
+const API_BASE = "http://127.0.0.1:5000"; // o "http://192.168.100.6:5000"
 
 document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();
@@ -59,14 +72,22 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("compareBtn").addEventListener("click", compareCountries);
 
     document.getElementById("applyDateFilter").addEventListener("click", () => {
-        startDate = document.getElementById("startDate").value || defaultStartDate;
-        endDate = document.getElementById("endDate").value || defaultEndDate;
-        startTime = document.getElementById("startTime").value || defaultStartTime;
-        endTime = document.getElementById("endTime").value || defaultEndTime;
+        const newStartDate = document.getElementById("startDate").value;
+        const newEndDate = document.getElementById("endDate").value;
+        const newStartTime = document.getElementById("startTime").value;
+        const newEndTime = document.getElementById("endTime").value;
+
+        if (!validateDateTimeFilters(newStartDate, newStartTime, newEndDate, newEndTime)) return;
+
+        startDate = newStartDate || startDate;
+        endDate = newEndDate || endDate;
+        startTime = newStartTime || startTime;
+        endTime = newEndTime || endTime;
 
         updateDashboard();
         showToast("Filtros aplicados");
     });
+
 
     document.getElementById("clearFilters").addEventListener("click", () => {
         startDate = defaultStartDate;
@@ -86,49 +107,95 @@ document.addEventListener("DOMContentLoaded", () => {
     setupTabs();
 });
 
-/* =======================
-   CARGA Y PARSEO
-======================= */
+// =======================================
+// CARGA DE DATOS DESDE API
+// =======================================
 async function loadData() {
-    const response = await fetch("../tendencias.csv");
-    const text = await response.text();
-    allData = parseCSV(text);
-    populateCountrySelector();
-    updateDashboard();
-    showLastUpdate();
+    try {
+        const response = await fetch(`${API_BASE}/trends`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        allData = await response.json();
+
+        // Adaptar datos al formato esperado
+        allData = allData.map(d => ({
+            fecha: d.fecha || "2025-01-01",
+            hora: d.hora || "00:00",
+            trend: d.trend || d.tendencia || "",
+            tweet_count: d.tweet_count || d.numeroDeTwits || 0,
+            country: (d.country || d.pais || "").toLowerCase()
+        }));
+
+        populateCountrySelector();
+        updateDashboard();
+        showLastUpdate();
+
+    } catch (err) {
+        console.error("Error cargando tendencias:", err);
+        showToast("❌ Error cargando tendencias desde el servidor");
+    }
 }
 
-function parseCSV(data) {
-    const lines = data.trim().split("\n");
-    lines.shift();
-    return lines.map(line => {
-        const parts = line.split(",");
-        return {
-            fecha: parts[0].trim(),
-            hora: parts[1].trim(),
-            trend: parts[2].trim(),
-            tweet_count: parseInt(parts[3]) || 0,
-            country: parts[4].trim().toLowerCase()
-        };
+// =======================================
+// UTILIDADES
+// =======================================
+function translateCountry(code) { return countryMap[code] || code; }
+function formatNumber(num) { return num.toLocaleString("es-ES"); }
+
+async function showLastUpdate() {
+    try {
+        const res = await fetch(`${API_BASE}/last_update`);
+        const data = await res.json();
+        document.getElementById("lastUpdate").textContent = `Última actualización: ${data.last_update}`;
+    } catch (err) {
+        console.error("Error obteniendo última actualización:", err);
+    }
+}
+
+// =======================================
+// FILTROS
+// =======================================
+function filterByDateTime(data) {
+    const sDateTime = startDate ? new Date(startDate + "T" + (startTime || "00:00")) : null;
+    const eDateTime = endDate ? new Date(endDate + "T" + (endTime || "23:59")) : null;
+
+    return data.filter(d => {
+        const dt = new Date(d.fecha + "T" + d.hora);
+        if (sDateTime && dt < sDateTime) return false;
+        if (eDateTime && dt > eDateTime) return false;
+        return true;
     });
 }
 
-/* =======================
-   UTILIDAD: AGRUPAR TENDENCIAS
-======================= */
+// =======================================
+// AGRUPAR TENDENCIAS (último registro por día y país)
+// =======================================
 function groupByTrend(data) {
     const grouped = {};
     data.forEach(d => {
-        const key = d.trend + '||' + d.country;
-        if (!grouped[key]) grouped[key] = { ...d };
-        else grouped[key].tweet_count += d.tweet_count;
+        // clave única por tendencia + país + fecha
+        const key = d.trend + '||' + d.country + '||' + d.fecha;
+
+        // si no existe, o si este registro es más reciente, lo guardamos
+        if (!grouped[key] || new Date(d.fecha + "T" + d.hora) > new Date(grouped[key].fecha + "T" + grouped[key].hora)) {
+            grouped[key] = { ...d };
+        }
     });
-    return Object.values(grouped);
+
+    // ahora sumamos por tendencia + país (manteniendo solo el último por día)
+    const finalGroup = {};
+    Object.values(grouped).forEach(d => {
+        const key = d.trend + '||' + d.country;
+        if (!finalGroup[key]) finalGroup[key] = { ...d };
+        else finalGroup[key].tweet_count += d.tweet_count;
+    });
+
+    return Object.values(finalGroup);
 }
 
-/* =======================
-   SELECTORES
-======================= */
+// =======================================
+// SELECTORES
+// =======================================
 function populateCountrySelector() {
     const select = document.getElementById("countrySelect");
     const c1 = document.getElementById("country1");
@@ -146,24 +213,9 @@ function populateCountrySelector() {
     });
 }
 
-/* =======================
-   FILTRO FECHA + HORA
-======================= */
-function filterByDateTime(data) {
-    const sDateTime = startDate ? new Date(startDate + "T" + (startTime || "00:00")) : null;
-    const eDateTime = endDate ? new Date(endDate + "T" + (endTime || "23:59")) : null;
-
-    return data.filter(d => {
-        const dt = new Date(d.fecha + "T" + d.hora);
-        if (sDateTime && dt < sDateTime) return false;
-        if (eDateTime && dt > eDateTime) return false;
-        return true;
-    });
-}
-
-/* =======================
-   DASHBOARD Y GRÁFICOS
-======================= */
+// =======================================
+// DASHBOARD Y GRÁFICOS
+// =======================================
 function updateDashboard() {
     const country = document.getElementById("countrySelect").value;
     const topN = parseInt(document.getElementById("topSelect").value);
@@ -177,12 +229,9 @@ function updateDashboard() {
     updateTrendsChart(data.slice(0, topN));
     updateCountryChart(data);
     updateGlobalStats();
-    compareCountries(); // refresca comparador automáticamente
+    compareCountries();
 }
 
-/* =======================
-   GRÁFICOS
-======================= */
 function updateTrendsChart(data) {
     if (trendsChart) trendsChart.destroy();
     trendsChart = new Chart(document.getElementById("trendsChart"), {
@@ -194,10 +243,20 @@ function updateTrendsChart(data) {
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: value => formatNumber(value) } } }
+            scales: { 
+                y: { ticks: { callback: value => formatNumber(value) } },
+                x: {
+                    ticks: {
+                        autoSkip: false,  // mostrar todos
+                        maxRotation: 45,  // rotar hasta 45 grados
+                        minRotation: 30
+                    }
+                }
+            }
         }
     });
 }
+
 
 function updateCountryChart(dataFiltered) {
     if (countryChart) countryChart.destroy();
@@ -209,13 +268,16 @@ function updateCountryChart(dataFiltered) {
     const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
     countryChart = new Chart(document.getElementById("countryChart"), {
         type: "pie",
-        data: { labels: sorted.map(d => translateCountry(d[0])), datasets: [{ data: sorted.map(d => d[1]), backgroundColor: ["#2563eb","#16a34a","#f59e0b","#dc2626","#7c3aed","#0ea5e9","#14b8a6","#e11d48"] }] }
+        data: { 
+            labels: sorted.map(d => translateCountry(d[0])), 
+            datasets: [{ 
+                data: sorted.map(d => d[1]), 
+                backgroundColor: ["#2563eb","#16a34a","#f59e0b","#dc2626","#7c3aed","#0ea5e9","#14b8a6","#e11d48"] 
+            }] 
+        }
     });
 }
 
-/* =======================
-   DASHBOARD GLOBAL
-======================= */
 function updateGlobalStats() {
     const trendMap = {};
     const countryStats = {};
@@ -253,9 +315,9 @@ function updateGlobalStats() {
     `;
 }
 
-/* =======================
-   COMPARADOR
-======================= */
+// =======================================
+// COMPARADOR
+// =======================================
 function compareCountries() {
     const c1 = document.getElementById("country1").value;
     const c2 = document.getElementById("country2").value;
@@ -287,9 +349,9 @@ function compareCountries() {
     document.getElementById("c2Top").textContent = s2.top;
 }
 
-/* =======================
-   TABS
-======================= */
+// =======================================
+// TABS
+// =======================================
 function setupTabs() {
     document.querySelectorAll(".tab-btn").forEach(btn=>{
         btn.addEventListener("click",()=>{
@@ -302,12 +364,9 @@ function setupTabs() {
     });
 }
 
-/* =======================
-   UTILIDADES
-======================= */
-function translateCountry(code){return countryMap[code]||code;}
-function formatNumber(num){return num.toLocaleString("es-ES");}
-
+// =======================================
+// MODAL
+// =======================================
 function openTrendModal(countries,trend){
     const modal=document.getElementById("trendModal");
     const title=document.getElementById("modalTitle");
@@ -324,9 +383,9 @@ function openTrendModal(countries,trend){
 document.getElementById("closeModal").onclick=()=>document.getElementById("trendModal").classList.add("hidden");
 window.onclick=e=>{if(e.target===document.getElementById("trendModal"))document.getElementById("trendModal").classList.add("hidden");};
 
-/* =======================
-   TOAST
-======================= */
+// =======================================
+// TOAST
+// =======================================
 function showToast(message) {
     const toast = document.getElementById("toast");
     toast.textContent = message;
@@ -336,3 +395,15 @@ function showToast(message) {
         toast.classList.remove("show");
     }, 2500);
 }
+
+function validateDateTimeFilters(startDate, startTime, endDate, endTime) {
+    const sDateTime = new Date(startDate + "T" + (startTime || "00:00"));
+    const eDateTime = new Date(endDate + "T" + (endTime || "23:59"));
+
+    if (sDateTime > eDateTime) {
+        showToast("⚠️ La fecha y hora de inicio no puede ser posterior a la de fin");
+        return false;
+    }
+    return true;
+}
+

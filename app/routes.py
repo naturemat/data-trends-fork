@@ -1,20 +1,24 @@
 """Flask route handlers for trends API."""
 
 from flask import Blueprint, request, jsonify
-from app.crud import create_trend, get_trends, get_trends_by_country, get_trends_by_date_range, save_scraped_trends
+from app.crud import create_trend, get_trends, get_trends_by_country, get_trends_by_date_range, save_scraped_trends, Trend, get_latest_per_day
 
 routes_blueprint = Blueprint("routes", __name__)
 
 
 @routes_blueprint.get("/trends")
 def list_trends():
-    """Obtiene todas las tendencias."""
-    limit = request.args.get("limit", 100, type=int)
+    """Obtiene tendencias."""
+    limit = request.args.get("limit", default=None, type=int)  # None si no se pasa
     pais = request.args.get("pais")
     fecha_inicio = request.args.get("fecha_inicio")
     fecha_fin = request.args.get("fecha_fin")
+    daily = request.args.get("daily", "false").lower() == "true"  # <-- nuevo
 
-    if fecha_inicio and fecha_fin:
+    if daily:
+        # Obtiene el último registro de cada día
+        trends = get_latest_per_day(pais)
+    elif fecha_inicio and fecha_fin:
         trends = get_trends_by_date_range(fecha_inicio, fecha_fin, limit)
     elif pais:
         trends = get_trends_by_country(pais, limit)
@@ -22,7 +26,6 @@ def list_trends():
         trends = get_trends(limit)
 
     return jsonify(trends)
-
 
 @routes_blueprint.post("/trends")
 def add_trend():
@@ -56,3 +59,15 @@ def get_countries():
     # Esto podría ser una colección separada o calculado dinámicamente
     countries = ["worldwide", "united-states", "spain", "mexico", "argentina"]  # Ejemplo
     return jsonify({"countries": countries})
+
+@routes_blueprint.get("/last_update")
+def last_update():
+    """Devuelve la fecha y hora del último registro."""
+    latest = Trend.collection.find().sort("scraped_at", -1).limit(1)
+    latest = list(latest)
+    if latest:
+        scraped_at = latest[0]["scraped_at"]  # datetime
+        return jsonify({
+            "last_update": scraped_at.strftime("%d/%m/%Y %H:%M:%S")
+        })
+    return jsonify({"last_update": "No hay registros"})
