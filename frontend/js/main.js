@@ -38,12 +38,8 @@ const countryMap = {
     "united-states": "Estados Unidos"
 };
 
-
-// Detecta si estamos en local o en producción
-const API_URL = "http://127.0.0.1:5000";
-
 // URL base de la API (ajusta según si es local o EC2)
-const API_BASE = "http://127.0.0.1:5000"; // o "http://192.168.100.6:5000"
+const API_BASE = "http://127.0.0.1:5000";
 
 document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();

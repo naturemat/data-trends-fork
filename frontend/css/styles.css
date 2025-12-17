@@ -1,3 +1,6 @@
+/* =====================================================
+   RESET Y BASE
+===================================================== */
 * {
     box-sizing: border-box;
 }
@@ -9,61 +12,56 @@ body {
     color: #1f2933;
 }
 
-/* =========================
-   HEADER
-========================= */
-
-/* Tipografía moderna para todo el header */
+/* =====================================================
+   TIPOGRAFÍA
+===================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap');
 
+/* =====================================================
+   HEADER
+===================================================== */
 .header {
-    text-align: center;
-    padding: 40px 20px 20px; /* Más espacio arriba */
     position: relative;
+    text-align: center;
+    padding: 40px 20px 20px;
     font-family: 'Montserrat', sans-serif;
 }
 
 .header-left {
     position: absolute;
+    top: 10px;
     left: 20px;
-    top: 10px; /* Subido más arriba */
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.header-left .logo {
-    width: 80px; /* Logo más grande */
-    height: auto;
+.logo {
+    width: 80px;
 }
 
-.header-left .logo-text {
-    font-size: 24px; /* Texto más grande */
+.logo-text {
+    font-size: 24px;
     font-weight: 700;
     color: #2563eb;
-    letter-spacing: 1px; /* Espaciado de letras para un look más moderno */
+    letter-spacing: 1px;
 }
 
-/* Ajuste del título principal */
 .header h1 {
-    margin-top: 0;
+    margin: 0;
     font-size: 32px;
     font-weight: 700;
-    color: #1f2933;
 }
 
-/* Ajuste del subtítulo */
 .header p {
     margin-top: 5px;
     font-size: 14px;
     color: #475569;
 }
 
-
-/* =========================
+/* =====================================================
    TABS
-========================= */
-
+===================================================== */
 .tabs {
     display: flex;
     justify-content: center;
@@ -76,28 +74,23 @@ body {
     border: none;
     border-radius: 8px;
     background: #e5e7eb;
-    cursor: pointer;
     font-weight: 500;
+    cursor: pointer;
 }
 
 .tab-btn.active {
     background: #2563eb;
-    color: white;
+    color: #fff;
 }
 
-/* =========================
-   CONTENEDOR
-========================= */
-
+/* =====================================================
+   CONTENEDOR PRINCIPAL
+===================================================== */
 .container {
     max-width: 1200px;
     margin: auto;
     padding: 0 20px 40px;
 }
-
-/* =========================
-   TAB CONTENT
-========================= */
 
 .tab-content {
     display: none;
@@ -107,10 +100,9 @@ body {
     display: block;
 }
 
-/* =========================
+/* =====================================================
    DASHBOARD
-========================= */
-
+===================================================== */
 .cards {
     display: flex;
     justify-content: center;
@@ -119,16 +111,12 @@ body {
 }
 
 .card {
-    background: white;
     width: 320px;
     padding: 25px;
+    background: #fff;
     border-radius: 14px;
     text-align: center;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-}
-
-.card h3 {
-    margin-bottom: 10px;
 }
 
 .card-desc {
@@ -137,28 +125,56 @@ body {
     margin-bottom: 12px;
 }
 
-/* =========================
+/* =====================================================
    FILTROS
-========================= */
-
-.filters {
+===================================================== */
+.filters,
+.date-filters,
+.compare-controls {
     display: flex;
     justify-content: center;
     gap: 15px;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 
-select, button {
+select,
+button,
+.date-filters input {
     padding: 8px 12px;
     border-radius: 6px;
     border: 1px solid #cbd5e1;
     font-size: 14px;
 }
 
-/* =========================
-   GRÁFICOS
-========================= */
+button {
+    cursor: pointer;
+}
 
+button:hover {
+    opacity: 0.95;
+}
+
+/* =====================================================
+   BOTONES DESTACADOS
+===================================================== */
+#analyzeBtn,
+.compare-controls button,
+.date-filters button {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    font-weight: 500;
+}
+
+#analyzeBtn:hover,
+.compare-controls button:hover,
+.date-filters button:hover {
+    background: #1e40af;
+}
+
+/* =====================================================
+   GRÁFICOS
+===================================================== */
 .charts {
     display: flex;
     justify-content: center;
@@ -167,9 +183,9 @@ select, button {
 }
 
 .chart-box {
-    background: white;
     width: 520px;
     padding: 20px;
+    background: #fff;
     border-radius: 14px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     text-align: center;
@@ -181,98 +197,17 @@ select, button {
     margin-bottom: 12px;
 }
 
-/* =========================
+/* =====================================================
    COMPARADOR
-========================= */
-
-.compare-controls {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-bottom: 25px;
-}
-
-.compare-controls button {
-    background: #2563eb;
-    color: white;
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.compare-controls button:hover {
-    background: #1e40af;
-}
-
-/* Tarjeta del comparador */
+===================================================== */
 .compare-card {
-    background: white;
-    padding: 25px;
-    border-radius: 16px;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.12);
     max-width: 850px;
     margin: auto;
+    padding: 25px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.12);
 }
-
-/* =========================
-   TABLA COMPARATIVA
-========================= */
-
-#compareTable {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 14px;
-    margin-top: 10px;
-}
-
-/* Encabezados */
-#compareTable th {
-    background: #2563eb;
-    color: white;
-    padding: 14px;
-    font-weight: 600;
-    text-align: center;
-}
-
-#compareTable th:first-child {
-    border-top-left-radius: 12px;
-}
-
-#compareTable th:last-child {
-    border-top-right-radius: 12px;
-}
-
-/* Celdas */
-#compareTable td {
-    padding: 14px;
-    text-align: center;
-    border-bottom: 1px solid #e5e7eb;
-    word-break: break-word;
-    max-width: 250px;
-}
-
-/* Columna de métricas */
-#compareTable td:first-child {
-    text-align: left;
-    font-weight: 600;
-    background: #f8fafc;
-    width: 35%;
-}
-
-/* Última fila sin borde */
-#compareTable tr:last-child td {
-    border-bottom: none;
-}
-
-/* Hover sutil */
-#compareTable tr:hover td {
-    background: #f1f5f9;
-}
-
-/* =========================
-   OTROS
-========================= */
 
 .section-desc {
     text-align: center;
@@ -281,30 +216,47 @@ select, button {
     margin-bottom: 20px;
 }
 
-details {
-    margin-top: 10px;
-    text-align: left;
-}
-
-details summary {
-    cursor: pointer;
-    font-weight: 600;
-    margin-bottom: 5px;
-}
-
-details ul {
-    padding-left: 18px;
+/* =====================================================
+   TABLA COMPARATIVA
+===================================================== */
+#compareTable {
+    width: 100%;
+    border-spacing: 0;
     font-size: 14px;
 }
 
-/* MODAL */
+#compareTable th {
+    background: #2563eb;
+    color: #fff;
+    padding: 14px;
+}
+
+#compareTable td {
+    padding: 14px;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#compareTable td:first-child {
+    text-align: left;
+    font-weight: 600;
+    background: #f8fafc;
+}
+
+#compareTable tr:hover td {
+    background: #f1f5f9;
+}
+
+/* =====================================================
+   MODAL
+===================================================== */
 .modal {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.45);
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.45);
     z-index: 999;
 }
 
@@ -313,18 +265,18 @@ details ul {
 }
 
 .modal-content {
-    background: white;
     width: 420px;
     max-width: 90%;
     padding: 25px;
+    background: #fff;
     border-radius: 16px;
     box-shadow: 0 25px 50px rgba(0,0,0,0.2);
     animation: scaleIn 0.25s ease;
 }
 
 @keyframes scaleIn {
-    from { transform: scale(0.9); opacity: 0 }
-    to { transform: scale(1); opacity: 1 }
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 #closeModal {
@@ -334,17 +286,9 @@ details ul {
     color: #64748b;
 }
 
-#modalTitle {
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-#modalList li {
-    margin-bottom: 8px;
-    font-size: 14px;
-}
-
-/* ITEMS CLICKABLES EN TOP TENDENCIAS */
+/* =====================================================
+   INTERACCIONES
+===================================================== */
 .trend-item {
     cursor: pointer;
     padding: 6px 8px;
@@ -357,94 +301,26 @@ details ul {
     transform: translateX(4px);
 }
 
-.date-filters {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.date-filters input, .date-filters button {
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #cbd5e1;
-    font-size: 14px;
-}
-
-.date-filters button {
-    background: #2563eb;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-weight: 500;
-}
-
-.date-filters button:hover {
-    background: #1e40af;
-}
-
-/* =========================
-   TOAST DE NOTIFICACIONES
-========================= */
-
+/* =====================================================
+   TOAST
+===================================================== */
 .toast {
     position: fixed;
     top: -60px;
     left: 50%;
     transform: translateX(-50%);
-    background: #2563eb;
-    color: white;
     padding: 12px 25px;
+    background: #2563eb;
+    color: #fff;
     border-radius: 8px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
     font-weight: 500;
-    transition: top 0.4s ease, opacity 0.4s ease;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
     opacity: 0;
+    transition: top 0.4s ease, opacity 0.4s ease;
     z-index: 1000;
 }
 
 .toast.show {
     top: 20px;
     opacity: 1;
-}
-
-.ai-response {
-    margin-top: 10px;
-    padding: 10px;
-    border: 1px solid #2563eb;
-    border-radius: 5px;
-    background-color: #f0f4ff;
-    white-space: pre-line;
-}
-
-/* Tarjeta de respuesta de la IA */
-.ai-response {
-    margin-top: 15px;
-    padding: 15px 20px;
-    border-radius: 10px;
-    background-color: #f3f4f6; /* gris claro */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    color: #111827; /* texto oscuro */
-    font-size: 0.95rem;
-    line-height: 1.5;
-    display: none; /* por defecto oculta */
-}
-
-.ai-response.visible {
-    display: block;
-}
-
-/* Botón de analizar IA */
-#analyzeBtn {
-    margin-left: 10px;
-    background-color: #2563eb;
-    color: white;
-    border: none;
-    padding: 7px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-#analyzeBtn:hover {
-    background-color: #1d4ed8;
 }
