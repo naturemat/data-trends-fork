@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard de Tendencias</title>
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- ================= HEADER ================= -->
+<header class="header">
+    <div class="header-left">
+        <img src="assets/logo.png" alt="DataTrendX Logo" class="logo">
+        <span class="logo-text">DataTrendX</span>
+    </div>
+
+    <h1>📊 Dashboard de Tendencias</h1>
+    <p>Análisis visual de tendencias en Twitter obtenidas mediante Web Scraping</p>
+    <p id="lastUpdate" class="last-update"></p>
+</header>
+
+<!-- ================= FILTROS DE FECHA ================= -->
+<section class="date-filters">
+    <label>
+        Desde:
+        <input type="date" id="startDate">
+        <input type="time" id="startTime">
+    </label>
+
+    <label>
+        Hasta:
+        <input type="date" id="endDate">
+        <input type="time" id="endTime">
+    </label>
+
+    <button id="applyDateFilter">Aplicar filtro</button>
+    <button id="clearFilters">Quitar filtros</button>
+    <button id="analyzeBtn" class="btn">Analizar tendencias con IA</button>
+</section>
+
+<!-- ================= MODAL IA ================= -->
+<div id="aiModal" class="modal hidden">
+    <div class="modal-content">
+        <span id="closeModal">&times;</span>
+        <h3>Resumen de tendencias (IA)</h3>
+
+        <div id="aiSummary" class="ai-summary">
+            Generando análisis...
+        </div>
+    </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div id="toast" class="toast"></div>
+
+<!-- ================= TABS ================= -->
+<nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="tab-charts">Gráficos</button>
+    <button class="tab-btn" data-tab="tab-compare">Comparador</button>
+</nav>
+
+<!-- ================= MAIN ================= -->
+<main class="container">
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="tab-dashboard" class="tab-content active">
+        <div class="cards">
+
+            <div class="card">
+                <h3>🌍 Top 5 tendencias más repetidas</h3>
+                <p class="card-desc">
+                    Tendencias que aparecen en mayor cantidad de países.
+                    Despliega cada una para ver países y número de tweets.
+                </p>
+                <div id="globalTrend">Cargando...</div>
+            </div>
+
+            <div class="card">
+                <h3>🔥 País con mayor actividad promedio</h3>
+                <p class="card-desc">
+                    Promedio de tweets por tendencia en cada país.
+                </p>
+                <p id="topCountry">Cargando...</p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ===== GRÁFICOS ===== -->
+    <section id="tab-charts" class="tab-content">
+
+        <div class="filters">
+            <select id="countrySelect"></select>
+            <select id="topSelect">
+                <option value="5">Top 5</option>
+                <option value="10" selected>Top 10</option>
+                <option value="15">Top 15</option>
+            </select>
+        </div>
+
+        <div class="charts">
+
+            <div class="chart-box">
+                <h3>Top Tendencias por País</h3>
+                <p class="chart-desc">
+                    Tendencias con mayor número de tweets según el país.
+                </p>
+                <canvas id="trendsChart"></canvas>
+            </div>
+
+            <div class="chart-box">
+                <h3>Distribución total de Tweets</h3>
+                <p class="chart-desc">
+                    Proporción total de tweets por país.
+                </p>
+                <canvas id="countryChart"></canvas>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ===== COMPARADOR ===== -->
+    <section id="tab-compare" class="tab-content">
+
+        <p class="section-desc">
+            Compara métricas generales entre dos países.
+        </p>
+
+        <div class="compare-controls">
+            <select id="country1"></select>
+            <select id="country2"></select>
+            <button id="compareBtn">Comparar</button>
+        </div>
+
+        <div class="compare-card">
+            <table id="compareTable">
+                <thead>
+                    <tr>
+                        <th>Métrica</th>
+                        <th id="c1Title">País 1</th>
+                        <th id="c2Title">País 2</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Total de tendencias</td>
+                        <td id="c1Trends">-</td>
+                        <td id="c2Trends">-</td>
+                    </tr>
+                    <tr>
+                        <td>Total de tweets</td>
+                        <td id="c1Tweets">-</td>
+                        <td id="c2Tweets">-</td>
+                    </tr>
+                    <tr>
+                        <td>Tendencia principal</td>
+                        <td id="c1Top">-</td>
+                        <td id="c2Top">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+
+</main>
+
+<!-- ================= MODAL TENDENCIAS ================= -->
+<div id="trendModal" class="modal hidden">
+    <div class="modal-content">
+        <span id="closeModal">&times;</span>
+        <h3 id="modalTitle"></h3>
+        <ul id="modalList"></ul>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="js/main.js"></script>
+</body>
+</html>

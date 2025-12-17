@@ -27,6 +27,11 @@ x-trends-scraper/
 │   ├── run.py        # Ejecutar servidor Flask
 │   ├── test_conn.py  # Probar conexión MongoDB
 │   └── demo_api.py   # Demo de la API
+├── frontend/         # Interfaz web del dashboard
+│   ├── index.html    # Página principal
+│   ├── assets/       # Recursos estáticos como imágenes
+│   ├── css/          # Hojas de estilo
+│   └── js/           # Scripts de frontend
 ├── drivers/          # Drivers para scraping
 ├── main.py           # Ejecutar scraper
 ├── requirements.txt  # Dependencias
@@ -62,6 +67,12 @@ x-trends-scraper/
 
 4. **Configura el scraper:**
    - Asegúrate de que `countries.txt` existe con la lista de países
+
+5. **Configura el API Key de Groq**
+   - Actualiza `.env` con tu API Key de Groq
+     ```
+     GROQCLOUD_API_KEY=API_KEY
+     ```
 
 ## Cómo usar
 

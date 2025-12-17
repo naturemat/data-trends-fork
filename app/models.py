@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Optional
 from app.db import db
+from pymongo import DESCENDING
 
 
 class Trend:
@@ -30,18 +31,61 @@ class Trend:
         return cls.collection.insert_one(document)
 
     @classmethod
-    def find_all(cls, limit: int = 100):
-        """Encuentra todos los documentos ordenados por fecha descendente."""
-        return list(cls.collection.find().sort("scraped_at", -1).limit(limit))
+    def find_all(cls, limit=None):
+        cursor = cls.collection.find().sort("scraped_at", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return list(cursor)
 
     @classmethod
-    def find_by_country(cls, pais: str, limit: int = 50):
+    def find_by_country(cls, pais: str, limit: Optional[int] = None):
         """Encuentra tendencias por país."""
-        return list(cls.collection.find({"pais": pais}).sort("scraped_at", -1).limit(limit))
+        cursor = cls.collection.find({"pais": pais}).sort("scraped_at", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return list(cursor)
 
     @classmethod
-    def find_by_date_range(cls, fecha_inicio: str, fecha_fin: str, limit: int = 100):
+    def find_by_date_range(cls, fecha_inicio: str, fecha_fin: str, limit: Optional[int] = None):
         """Encuentra tendencias por rango de fechas."""
-        return list(cls.collection.find({
+        cursor = cls.collection.find({
             "fecha": {"$gte": fecha_inicio, "$lte": fecha_fin}
-        }).sort("scraped_at", -1).limit(limit))
+        }).sort("scraped_at", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return list(cursor)
+    
+    @classmethod
+    def find_latest_per_day(cls, pais: str = None):
+        """
+        Obtiene el registro más reciente de cada día.
+        Si se indica un país, filtra por ese país.
+        """
+        pipeline = []
+
+        # Filtrar por país si se indica
+        if pais:
+            pipeline.append({"$match": {"pais": pais}})
+
+        # Ordenar por fecha y hora descendente
+        pipeline.append({"$sort": {"fecha": 1, "scraped_at": -1}})
+
+        # Agrupar por fecha, tomando el primer registro de cada grupo
+        pipeline.append({
+            "$group": {
+                "_id": "$fecha",
+                "tendencia": {"$first": "$tendencia"},
+                "numeroDeTwits": {"$first": "$numeroDeTwits"},
+                "pais": {"$first": "$pais"},
+                "hora": {"$first": "$hora"},
+                "scraped_at": {"$first": "$scraped_at"},
+                "_id": {"$first": "$_id"}  # Mantener ObjectId
+            }
+        })
+
+        # Ordenar por fecha descendente (último primero)
+        pipeline.append({"$sort": {"_id": -1}})
+
+        return list(cls.collection.aggregate(pipeline))
+
+
