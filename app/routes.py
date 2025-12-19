@@ -31,6 +31,18 @@ client = OpenAI(
 )
 
 # ---------------------------------------------------------------------
+# Obtener la instancia de Flask
+# ---------------------------------------------------------------------
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5000")
+
+@routes_blueprint.get("/config")
+def get_config():
+    """Devuelve configuración pública para el frontend."""
+    return jsonify({
+        "api_base": API_BASE_URL
+    })
+
+# ---------------------------------------------------------------------
 # Rutas de tendencias
 # ---------------------------------------------------------------------
 @routes_blueprint.get("/trends")
@@ -88,16 +100,29 @@ def add_trends_bulk():
 
 @routes_blueprint.get("/trends/countries")
 def get_countries():
-    """Devuelve países disponibles (mock / configurable)."""
-
+    """Devuelve la lista de países disponibles para consulta de tendencias."""
     countries = [
         "worldwide",
+        "australia",
+        "brazil",
+        "canada",
+        "france",
+        "germany",
+        "india",
+        "japan",
+        "netherlands",
+        "peru",
+        "russia",
+        "sweden",
+        "switzerland",
+        "united-kingdom",
         "united-states",
-        "spain",
-        "mexico",
+        "ecuador",
         "argentina",
+        "mexico",
+        "colombia",
+        "spain"
     ]
-
     return jsonify({"countries": countries})
 
 

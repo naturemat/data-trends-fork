@@ -38,8 +38,9 @@ const countryMap = {
     "united-states": "Estados Unidos"
 };
 
-// URL base de la API (ajusta según si es local o EC2)
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = await fetch("/config")
+  .then(r => r.json())
+  .then(d => d.api_base);
 
 document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();

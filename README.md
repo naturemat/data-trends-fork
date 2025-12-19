@@ -92,26 +92,27 @@ python scripts/demo_api.py
 ```
 
 ### 4. Ver tendencias desde el navegador
-- GET `/trends` - Todas las tendencias
-- GET `/trends?country=spain&limit=10` - Tendencias por país
-- POST `/trends` - Crear tendencia manual
-- POST `/trends/bulk` - Insertar múltiples tendencias
-
-## API Endpoints
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/trends` | Obtener tendencias (parámetros: `limit`, `country`) |
-| POST | `/trends` | Crear tendencia manual |
-| POST | `/trends/bulk` | Insertar tendencias del scraper |
-| GET | `/trends/countries` | Lista de países disponibles |
+- GET `/trends` – Todas las tendencias
+- GET `/trends?pais=spain&limit=10` – Tendencias por país
+- GET `/trends?fecha_inicio=YYYY-MM-DD&fecha_fin=YYYY-MM-DD` – Tendencias por rango de fechas
+- GET `/trends?daily=true` – Último registro por día
+- POST `/trends` – Crear tendencia manual
+- POST `/trends/bulk` – Insertar múltiples tendencias
+- GET `/last_update` – Última actualización del scraping
+- POST `/ai_summary` – Generar resumen de tendencias con IA
+- GET `/config` – Obtiene la configuración pública para el frontend
 
 ## Variables de entorno
 
 ```env
 MONGODB_URL=mongodb://localhost:27017/scraper_db
 FLASK_ENV=development
-SECRET_KEY=tu_clave_secreta_aqui
+API_BASE_URL=tu_api_base
+GROQCLOUD_API_KEY=tu_api_key
+MONGO_ROOT_USERNAME=Tu_username
+MONGO_ROOT_PASSWORD=tu_clave
+ME_USERNAME=User_de_MongoExpress
+ME_PASSWORD=tu_clave_de_MongoExpress
 ```
 
 ## Desarrollo
