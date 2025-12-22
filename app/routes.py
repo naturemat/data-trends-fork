@@ -1,16 +1,14 @@
 """Flask route handlers for trends API."""
 
 import os
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from openai import OpenAI
 
 # CRUD y modelos
 from app.crud import (
-    create_trend,
     get_trends,
     get_trends_by_country,
     get_trends_by_date_range,
-    save_scraped_trends,
     get_latest_per_day,
     Trend,
 )
@@ -45,6 +43,11 @@ def get_config():
 # ---------------------------------------------------------------------
 # Rutas de tendencias
 # ---------------------------------------------------------------------
+
+@routes_blueprint.get("/")
+def index():
+    return render_template("index.html")
+
 @routes_blueprint.get("/trends")
 def list_trends():
     """Obtiene tendencias con distintos filtros opcionales."""
@@ -65,66 +68,6 @@ def list_trends():
         trends = get_trends(limit)
 
     return jsonify(trends)
-
-
-@routes_blueprint.post("/trends")
-def add_trend():
-    """Crea una tendencia manualmente."""
-
-    data = request.json or {}
-
-    if "tendencia" not in data:
-        return jsonify({"error": "tendencia es requerido"}), 400
-
-    trend_id = create_trend(
-        tendencia=data["tendencia"],
-        numeroDeTwits=data.get("numeroDeTwits"),
-        pais=data.get("pais", "worldwide"),
-    )
-
-    return jsonify({"message": "Trend creado", "id": trend_id}), 201
-
-
-@routes_blueprint.post("/trends/bulk")
-def add_trends_bulk():
-    """Guarda múltiples tendencias provenientes del scraper."""
-
-    data = request.json
-
-    if not isinstance(data, list):
-        return jsonify({"error": "Se espera una lista de tendencias"}), 400
-
-    count = save_scraped_trends(data)
-    return jsonify({"message": f"{count} tendencias guardadas"}), 201
-
-
-@routes_blueprint.get("/trends/countries")
-def get_countries():
-    """Devuelve la lista de países disponibles para consulta de tendencias."""
-    countries = [
-        "worldwide",
-        "australia",
-        "brazil",
-        "canada",
-        "france",
-        "germany",
-        "india",
-        "japan",
-        "netherlands",
-        "peru",
-        "russia",
-        "sweden",
-        "switzerland",
-        "united-kingdom",
-        "united-states",
-        "ecuador",
-        "argentina",
-        "mexico",
-        "colombia",
-        "spain"
-    ]
-    return jsonify({"countries": countries})
-
 
 @routes_blueprint.get("/last_update")
 def last_update():

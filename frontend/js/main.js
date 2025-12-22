@@ -38,9 +38,7 @@ const countryMap = {
     "united-states": "Estados Unidos"
 };
 
-const API_BASE = await fetch("/config")
-  .then(r => r.json())
-  .then(d => d.api_base);
+let API_BASE = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();
@@ -66,7 +64,16 @@ document.addEventListener("DOMContentLoaded", () => {
     startTime = defaultStartTime;
     endTime = defaultEndTime;
 
-    loadData();
+    // 🔧 CAMBIO 2: obtener config ANTES de cargar datos
+    (async () => {
+        API_BASE = await fetch("/config")
+            .then(r => r.json())
+            .then(d => d.api_base);
+
+        // Mostrar en consola la API que se está usando
+        console.log("Usando API de Flask:", API_BASE);    
+        loadData();
+    })();
 
     document.getElementById("countrySelect").addEventListener("change", updateDashboard);
     document.getElementById("topSelect").addEventListener("change", updateDashboard);
@@ -89,7 +96,6 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("Filtros aplicados");
     });
 
-
     document.getElementById("clearFilters").addEventListener("click", () => {
         startDate = defaultStartDate;
         endDate = defaultEndDate;
@@ -109,14 +115,10 @@ document.addEventListener("DOMContentLoaded", () => {
     aiSummary = document.getElementById("aiSummary");
     closeModal = document.getElementById("closeModal");
 
-    closeModal.addEventListener("click", () => {
-        aiModal.classList.add("hidden");
-    });
+    closeModal.addEventListener("click", () => aiModal.classList.add("hidden"));
 
     aiModal.addEventListener("click", (e) => {
-        if (e.target === aiModal) {
-            aiModal.classList.add("hidden");
-        }
+        if (e.target === aiModal) aiModal.classList.add("hidden");
     });
 
     document.getElementById("analyzeBtn").addEventListener("click", async () => {
@@ -139,7 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const result = await res.json();
             aiSummary.textContent = result.summary || "No se pudo generar el resumen";
-
         } catch (err) {
             console.error(err);
             aiSummary.textContent = "Error generando resumen con IA";
@@ -148,8 +149,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setupTabs();
 });
-
-
 
 // =======================================
 // CARGA DE DATOS DESDE API

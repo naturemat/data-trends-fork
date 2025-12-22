@@ -5,7 +5,7 @@
     <title>Dashboard de Tendencias</title>
 
     <!-- Estilos -->
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,7 +15,7 @@
 <!-- ================= HEADER ================= -->
 <header class="header">
     <div class="header-left">
-        <img src="assets/logo.png" alt="DataTrendX Logo" class="logo">
+        <img src="{{ url_for('static', filename='assets/logo.png') }}" alt="DataTrendX Logo" class="logo">
         <span class="logo-text">DataTrendX</span>
     </div>
 
@@ -181,6 +181,6 @@
 </div>
 
 <!-- Scripts -->
-<script src="js/main.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
