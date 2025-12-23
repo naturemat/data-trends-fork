@@ -41,18 +41,18 @@ const countryMap = {
 let API_BASE = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    const now = new Date();
+    const nowUTC = getNowUTC();
 
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-
-    const defaultStartDate = `${yyyy}-${mm}-${dd}`;
-    const defaultEndDate = `${yyyy}-${mm}-${dd}`;
+    const defaultStartDate = `${nowUTC.year}-${nowUTC.month}-${nowUTC.day}`;
+    const defaultEndDate   = `${nowUTC.year}-${nowUTC.month}-${nowUTC.day}`;
     const defaultStartTime = "00:00";
-    const defaultEndTime = `${hh}:${min}`;
+    const defaultEndTime   = `${nowUTC.hour}:${nowUTC.minute}`;
+
+    const yyyy = nowUTC.year;
+    const mm   = nowUTC.month;
+    const dd   = nowUTC.day;
+    const hh   = nowUTC.hour;
+    const min  = nowUTC.minute;
 
     document.getElementById("startDate").value = defaultStartDate;
     document.getElementById("endDate").value = defaultEndDate;
@@ -69,9 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         API_BASE = await fetch("/config")
             .then(r => r.json())
             .then(d => d.api_base);
-
-        // Mostrar en consola la API que se está usando
-        console.log("Usando API de Flask:", API_BASE);    
+  
         loadData();
     })();
 
@@ -122,25 +120,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("analyzeBtn").addEventListener("click", async () => {
-        const filteredData = getFilteredDataForAI();
+        const filteredData = getFilteredDataForAI(); // tus datos del dashboard
 
         if (!filteredData.length) {
             showToast("No hay datos filtrados para analizar");
             return;
         }
 
-        aiSummary.textContent = "🤖 Analizando tendencias...";
+        aiSummary.textContent = "Analizando tendencias...";
         aiModal.classList.remove("hidden");
+
+        // Agrupar por tendencia global y calcular total de tweets
+        const trendMap = {};
+        filteredData.forEach(d => {
+            const key = d.trend;
+            if (!trendMap[key]) trendMap[key] = { trend: key, countries: [], totalTweets: 0 };
+            trendMap[key].countries.push({ country: d.country, tweets: d.tweet_count });
+            trendMap[key].totalTweets += d.tweet_count;
+        });
+
+        // Construir payload con top 5 tendencias y top 3 países por tendencia
+        const topGlobalTrends = Object.values(trendMap)
+            .sort((a, b) => b.totalTweets - a.totalTweets)
+            .slice(0, 5)
+            .map(t => ({
+                trend: t.trend,
+                totalTweets: t.totalTweets,
+                countries: t.countries
+                    .sort((a, b) => b.tweets - a.tweets)
+                    .slice(0, 3) // solo top 3 países
+            }));
+
+        const summaryPayload = {
+            dateRange: { startDate, endDate },
+            totalTrends: topGlobalTrends.length,
+            topTrends: topGlobalTrends
+        };
 
         try {
             const res = await fetch(`${API_BASE}/ai_summary`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: filteredData })
+                body: JSON.stringify(summaryPayload)
             });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const result = await res.json();
             aiSummary.textContent = result.summary || "No se pudo generar el resumen";
+
         } catch (err) {
             console.error(err);
             aiSummary.textContent = "Error generando resumen con IA";
@@ -189,21 +217,47 @@ async function showLastUpdate() {
     try {
         const res = await fetch(`${API_BASE}/last_update`);
         const data = await res.json();
-        document.getElementById("lastUpdate").textContent = `Última actualización: ${data.last_update}`;
+
+        document.getElementById("lastUpdate").textContent =
+            `Última actualización: ${data.last_update} (UTC)`;
+
     } catch (err) {
         console.error("Error obteniendo última actualización:", err);
     }
+}
+
+// Devuelve fecha y hora actual en UTC
+function getNowUTC() {
+    const now = new Date();
+    return {
+        year: now.getUTCFullYear(),
+        month: String(now.getUTCMonth() + 1).padStart(2, "0"),
+        day: String(now.getUTCDate()).padStart(2, "0"),
+        hour: String(now.getUTCHours()).padStart(2, "0"),
+        minute: String(now.getUTCMinutes()).padStart(2, "0"),
+        second: String(now.getUTCSeconds()).padStart(2, "0")
+    };
+}
+
+// Crea un Date interpretado explícitamente como UTC
+function toUTCDate(date, time = "00:00") {
+    return new Date(`${date}T${time}:00Z`);
 }
 
 // =======================================
 // FILTROS
 // =======================================
 function filterByDateTime(data) {
-    const sDateTime = startDate ? new Date(startDate + "T" + (startTime || "00:00")) : null;
-    const eDateTime = endDate ? new Date(endDate + "T" + (endTime || "23:59")) : null;
+    const sDateTime = startDate
+        ? toUTCDate(startDate, startTime || "00:00")
+        : null;
+
+    const eDateTime = endDate
+        ? toUTCDate(endDate, endTime || "23:59")
+        : null;
 
     return data.filter(d => {
-        const dt = new Date(d.fecha + "T" + d.hora);
+        const dt = toUTCDate(d.fecha, d.hora);
         if (sDateTime && dt < sDateTime) return false;
         if (eDateTime && dt > eDateTime) return false;
         return true;
@@ -220,7 +274,9 @@ function groupByTrend(data) {
         const key = d.trend + '||' + d.country + '||' + d.fecha;
 
         // si no existe, o si este registro es más reciente, lo guardamos
-        if (!grouped[key] || new Date(d.fecha + "T" + d.hora) > new Date(grouped[key].fecha + "T" + grouped[key].hora)) {
+        if (!grouped[key] ||
+            toUTCDate(d.fecha, d.hora) >
+            toUTCDate(grouped[key].fecha, grouped[key].hora)) {
             grouped[key] = { ...d };
         }
     });
