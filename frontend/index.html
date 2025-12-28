@@ -2,185 +2,160 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard de Tendencias</title>
-
-    <!-- Estilos -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-
-    <!-- Chart.js -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='assets/logo.png') }}">
+    <title>DataTrendX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Forzamos que el contenedor no pueda crecer más allá de lo definido */
+        .chart-container {
+            position: relative;
+            height: 300px !important; /* Altura fija en píxeles */
+            width: 100% !important;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800">
 
-<!-- ================= HEADER ================= -->
-<header class="header">
-    <div class="header-left">
-        <img src="{{ url_for('static', filename='assets/logo.png') }}" alt="DataTrendX Logo" class="logo">
-        <span class="logo-text">DataTrendX</span>
-    </div>
-
-    <h1>📊 Dashboard de Tendencias</h1>
-    <p>Análisis visual de tendencias en Twitter obtenidas mediante Web Scraping</p>
-    <p id="lastUpdate" class="last-update"></p>
-</header>
-
-<!-- ================= FILTROS DE FECHA ================= -->
-<section class="date-filters">
-    <label>
-        Desde:
-        <input type="date" id="startDate">
-        <input type="time" id="startTime">
-    </label>
-
-    <label>
-        Hasta:
-        <input type="date" id="endDate">
-        <input type="time" id="endTime">
-    </label>
-
-    <button id="applyDateFilter">Aplicar filtro</button>
-    <button id="clearFilters">Quitar filtros</button>
-    <button id="analyzeBtn" class="btn">Analizar tendencias con IA</button>
-</section>
-
-<!-- ================= MODAL IA ================= -->
-<div id="aiModal" class="modal hidden">
-    <div class="modal-content">
-        <span id="closeModal">&times;</span>
-        <h3>Resumen de tendencias (IA)</h3>
-
-        <div id="aiSummary" class="ai-summary">
-            Generando análisis...
-        </div>
-    </div>
-</div>
-
-<!-- ================= TOAST ================= -->
-<div id="toast" class="toast"></div>
-
-<!-- ================= TABS ================= -->
-<nav class="tabs">
-    <button class="tab-btn active" data-tab="tab-dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="tab-charts">Gráficos</button>
-    <button class="tab-btn" data-tab="tab-compare">Comparador</button>
-</nav>
-
-<!-- ================= MAIN ================= -->
-<main class="container">
-
-    <!-- ===== DASHBOARD ===== -->
-    <section id="tab-dashboard" class="tab-content active">
-        <div class="cards">
-
-            <div class="card">
-                <h3>🌍 Top 5 tendencias más repetidas</h3>
-                <p class="card-desc">
-                    Tendencias que aparecen en mayor cantidad de países.
-                    Despliega cada una para ver países y número de tweets.
-                </p>
-                <div id="globalTrend">Cargando...</div>
+    <header class="bg-white shadow-sm border-b sticky top-0 z-10 p-4">
+        <div class="max-w-7xl mx-auto flex flex-wrap gap-4 items-end justify-between">
+            <img src="{{ url_for('static', filename='assets/logo.png') }}" 
+                 alt="Logo" 
+                 class="h-12 w-auto object-contain">
+            <div>
+                <h1 class="text-xl font-bold text-blue-600">DataTrendX</h1>
+                <p class="text-xs text-slate-500" id="last-update">Actualizando...</p>
             </div>
 
-            <div class="card">
-                <h3>🔥 País con mayor actividad promedio</h3>
-                <p class="card-desc">
-                    Promedio de tweets por tendencia en cada país.
-                </p>
-                <p id="topCountry">Cargando...</p>
+            <div class="flex flex-wrap gap-3 text-sm">
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">País</label>
+                    <select id="filter-pais" class="border rounded px-2 py-1 bg-white">
+                        <option value="worldwide">Global (Worldwide)</option>
+                        <option value="argentina">Argentina</option>
+                        <option value="australia">Australia</option>
+                        <option value="brazil">Brazil</option>
+                        <option value="canada">Canada</option>
+                        <option value="colombia">Colombia</option>
+                        <option value="ecuador">Ecuador</option>
+                        <option value="france">France</option>
+                        <option value="germany">Germany</option>
+                        <option value="india">India</option>
+                        <option value="japan">Japan</option>
+                        <option value="mexico">Mexico</option>
+                        <option value="netherlands">Netherlands</option>
+                        <option value="peru">Peru</option>
+                        <option value="russia">Russia</option>
+                        <option value="spain">Spain</option>
+                        <option value="sweden">Sweden</option>
+                        <option value="switzerland">Switzerland</option>
+                        <option value="united-kingdom">United Kingdom</option>
+                        <option value="united-states">United States</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Desde</label>
+                    <input type="date" id="filter-date-from" class="border rounded px-2 py-1">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Hasta</label>
+                    <input type="date" id="filter-date-to" class="border rounded px-2 py-1">
+                </div>
+
+                <button id="btn-update" class="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 self-end transition">
+                    Actualizar
+                </button>
             </div>
-
         </div>
-    </section>
+    </header>
 
-    <!-- ===== GRÁFICOS ===== -->
-    <section id="tab-charts" class="tab-content">
-
-        <div class="filters">
-            <select id="countrySelect"></select>
-            <select id="topSelect">
-                <option value="5">Top 5</option>
-                <option value="10" selected>Top 10</option>
-                <option value="15">Top 15</option>
-            </select>
-        </div>
-
-        <div class="charts">
-
-            <div class="chart-box">
-                <h3>Top Tendencias por País</h3>
-                <p class="chart-desc">
-                    Tendencias con mayor número de tweets según el país.
-                </p>
-                <canvas id="trendsChart"></canvas>
+    <main class="max-w-7xl mx-auto p-4 space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-4 rounded-xl shadow-sm border">
+                <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Actividad Temporal</h2>
+                <div class="mt-2 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Mide el <strong>volumen total de temas únicos</strong> detectados en cada intervalo de tiempo. Los picos en la gráfica indican momentos de alta rotación de información o eventos de gran relevancia donde surgen muchos hashtags nuevos simultáneamente.
+                    </p>
+                </div>
+                <div class="h-64 relative"> <canvas id="chart-activity"></canvas>
+                </div>
             </div>
-
-            <div class="chart-box">
-                <h3>Distribución total de Tweets</h3>
-                <p class="chart-desc">
-                    Proporción total de tweets por país.
-                </p>
-                <canvas id="countryChart"></canvas>
+            
+            <div class="bg-white p-4 rounded-xl shadow-sm border">
+                <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Intensidad de Tweets</h2>
+                <div class="mt-2 p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-400">
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Compara la fuerza de cada tema según su volumen de publicaciones. La brecha entre el <strong>Máximo</strong> y el <strong>Promedio</strong> permite diferenciar temas con picos virales momentáneos de aquellos que mantienen una conversación constante y estable.
+                    </p>
+                </div>
+                <div class="h-64 relative"> <canvas id="chart-intensity"></canvas>
+                </div>
             </div>
-
-        </div>
-    </section>
-
-    <!-- ===== COMPARADOR ===== -->
-    <section id="tab-compare" class="tab-content">
-
-        <p class="section-desc">
-            Compara métricas generales entre dos países.
-        </p>
-
-        <div class="compare-controls">
-            <select id="country1"></select>
-            <select id="country2"></select>
-            <button id="compareBtn">Comparar</button>
         </div>
 
-        <div class="compare-card">
-            <table id="compareTable">
-                <thead>
-                    <tr>
-                        <th>Métrica</th>
-                        <th id="c1Title">País 1</th>
-                        <th id="c2Title">País 2</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Total de tendencias</td>
-                        <td id="c1Trends">-</td>
-                        <td id="c2Trends">-</td>
-                    </tr>
-                    <tr>
-                        <td>Total de tweets</td>
-                        <td id="c1Tweets">-</td>
-                        <td id="c2Tweets">-</td>
-                    </tr>
-                    <tr>
-                        <td>Tendencia principal</td>
-                        <td id="c1Top">-</td>
-                        <td id="c2Top">-</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="bg-white p-4 rounded-xl shadow-sm border">
+            <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Persistencia (Temas más duraderos)</h2>
+            <div class="mt-2 p-3 bg-indigo-50 rounded-lg border-l-4 border-indigo-400">
+            <p class="text-xs text-slate-600 leading-relaxed">
+                    Indica el <strong>nivel de retención</strong> de un tema. Una alta frecuencia (apariciones) sugiere que la tendencia ha logrado mantenerse en el ranking a pesar de la actualización constante de datos, reflejando temas de interés prolongado o debates activos.
+                </p>
+            </div>
+            <div class="h-80 relative"> <canvas id="chart-persistence"></canvas>
+            </div>
         </div>
 
-    </section>
+        <div class="bg-white p-4 rounded-xl shadow-sm border overflow-hidden">
+            <div class="bg-white p-6 rounded-xl shadow-sm border mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="font-bold text-slate-800 text-lg">Resumen Inteligente</h2>
+                        <p class="text-sm text-slate-500">Genera un análisis narrativo basado en los filtros actuales.</p>
+                    </div>
+                    <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2">
+                        <span>✨</span> Generar Análisis
+                    </button>
+                </div>
+                <div id="ai-response-container" class="hidden">
+                    <div class="p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-lg">
+                        <p id="ai-text" class="text-sm text-slate-700 italic leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+            <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Alcance Global (Spread)</h2>
+            <div class="mt-2 p-3 bg-slate-50 rounded-lg border-l-4 border-blue-500">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Esta métrica analiza la <strong>expansión territorial</strong> de los temas. Una tendencia se clasifica como 
+                    <span class="text-purple-700 font-bold">Global</span> si logra entrar en el ranking mundial (Worldwide), 
+                    <span class="text-blue-700 font-bold">Regional</span> si cruza fronteras y aparece en varios países simultáneamente, y 
+                    <span class="text-slate-700 font-bold">Local</span> si su impacto está contenido en una sola nación. 
+                    Es útil para medir si una conversación es un fenómeno cultural masivo o un interés específico de una comunidad.
+                </p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 border-b">
+                        <tr>
+                            <th class="p-4">Tendencia</th>
+                            <th class="p-4">Alcance</th>
+                            <th class="p-4">¿En Worldwide?</th>
+                            <th class="p-4">Lista de Países</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-spread-body" class="divide-y divide-slate-100">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
 
-</main>
-
-<!-- ================= MODAL TENDENCIAS ================= -->
-<div id="trendModal" class="modal hidden">
-    <div class="modal-content">
-        <span id="closeModal">&times;</span>
-        <h3 id="modalTitle"></h3>
-        <ul id="modalList"></ul>
-    </div>
-</div>
-
-<!-- Scripts -->
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
