@@ -30,7 +30,6 @@ x-trends-scraper/
 ├── frontend/         # Interfaz web del dashboard
 │   ├── index.html    # Página principal
 │   ├── assets/       # Recursos estáticos como imágenes
-│   ├── css/          # Hojas de estilo
 │   └── js/           # Scripts de frontend
 ├── drivers/          # Drivers para scraping
 ├── main.py           # Ejecutar scraper
