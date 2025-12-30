@@ -35,24 +35,27 @@ const countryTranslations = {
 };
 
 // Asegurar coherencia visual en los calendarios
-const inputFrom = document.getElementById('filter-date-from');
-const inputTo = document.getElementById('filter-date-to');
+// CORRECCIÓN: Usamos los IDs nuevos (startDate y endDate)
+const inputFrom = document.getElementById('startDate');
+const inputTo = document.getElementById('endDate');
 
-inputFrom.addEventListener('change', () => {
-    // El "mínimo" de la fecha final ahora es lo que diga la fecha inicial
-    inputTo.min = inputFrom.value;
-    if (inputTo.value < inputFrom.value) {
-        inputTo.value = inputFrom.value;
-    }
-});
+if (inputFrom && inputTo) {
+    inputFrom.addEventListener('change', () => {
+        // El "mínimo" de la fecha final ahora es lo que diga la fecha inicial
+        inputTo.min = inputFrom.value;
+        if (inputTo.value < inputFrom.value) {
+            inputTo.value = inputFrom.value;
+        }
+    });
 
-inputTo.addEventListener('change', () => {
-    // El "máximo" de la fecha inicial ahora es lo que diga la fecha final
-    inputFrom.max = inputTo.value;
-    if (inputFrom.value > inputTo.value) {
-        inputFrom.value = inputTo.value;
-    }
-});
+    inputTo.addEventListener('change', () => {
+        // El "máximo" de la fecha inicial ahora es lo que diga la fecha final
+        inputFrom.max = inputTo.value;
+        if (inputFrom.value > inputTo.value) {
+            inputFrom.value = inputTo.value;
+        }
+    });
+}
 
 // Convierte UTC (de MongoDB) a Hora Local del Navegador
 function formatToLocalTime(isoString, showTime = true) {
@@ -73,8 +76,9 @@ function formatToLocalTime(isoString, showTime = true) {
 }
 
 function getUTCRange() {
-    const dateFromInput = document.getElementById('filter-date-from').value; //
-    const dateToInput = document.getElementById('filter-date-to').value;
+    // CORRECCIÓN: IDs actualizados
+    const dateFromInput = document.getElementById('startDate').value; 
+    const dateToInput = document.getElementById('endDate').value;
 
     const localFrom = new Date(dateFromInput + "T00:00:00");
     const localTo = new Date(dateToInput + "T23:59:59");
@@ -122,7 +126,10 @@ const chartOptions = {
  */
 
 function drawActivity(data, granularity) {
-    const ctx = document.getElementById('chart-activity').getContext('2d');
+    const canvas = document.getElementById('chart-activity');
+    if (!canvas) return; // Protección si no existe
+
+    const ctx = canvas.getContext('2d');
     if (chartInstances.activity) chartInstances.activity.destroy();
 
     const showTime = (granularity === 'hour');
@@ -146,7 +153,10 @@ function drawActivity(data, granularity) {
 }
 
 function drawIntensity(data) {
-    const ctx = document.getElementById('chart-intensity').getContext('2d');
+    const canvas = document.getElementById('chart-intensity');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
     if (chartInstances.intensity) chartInstances.intensity.destroy();
 
     chartInstances.intensity = new Chart(ctx, {
@@ -176,7 +186,10 @@ function drawIntensity(data) {
 }
 
 function drawPersistence(data) {
-    const ctx = document.getElementById('chart-persistence').getContext('2d');
+    const canvas = document.getElementById('chart-persistence');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
     
     // 1. Destruir instancia previa
     if (chartInstances.persistence) chartInstances.persistence.destroy();
@@ -234,6 +247,8 @@ function drawPersistence(data) {
 
 function drawSpreadTable(data) {
     const container = document.getElementById('table-spread-body');
+    if (!container) return;
+    
     container.innerHTML = '';
 
     data.forEach(item => {
@@ -262,24 +277,29 @@ function drawSpreadTable(data) {
 
 async function refreshData() {
     const range = getUTCRange();
-    const pais = document.getElementById('filter-pais').value;
-    const dFrom = document.getElementById('filter-date-from').value;
-    const dTo = document.getElementById('filter-date-to').value;
+    // CORRECCIÓN: ID actualizado a countrySelect
+    const pais = document.getElementById('countrySelect').value;
+    const dFrom = document.getElementById('startDate').value;
+    const dTo = document.getElementById('endDate').value;
+    
     if (new Date(dFrom) > new Date(dTo)) {
         alert("La fecha de inicio ('Desde') no puede ser posterior a la fecha final ('Hasta').");
-        document.getElementById('filter-date-from').value = dTo;
+        document.getElementById('startDate').value = dTo;
         return; 
     }
 
     const granularity = getAutoGranularity(dFrom, dTo);
 
     const btn = document.getElementById('btn-update');
+    const originalText = btn.innerText;
     btn.innerText = 'Cargando...';
     btn.disabled = true;
 
+    // Nota: Asegúrate de que tu backend tenga rutas como /api/metrics/activity
     const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
+        console.log("Fetching from:", API_BASE);
         // Usamos ${API_BASE} antes de cada ruta
         const [act, int, per, spr] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
@@ -288,21 +308,28 @@ async function refreshData() {
             fetch(`${API_BASE}/api/metrics/spread${params}`).then(r => r.json())
         ]);
 
-        lastSpreadData = spr.data;
+        lastSpreadData = spr.data || [];
 
-        drawActivity(act.data, granularity);
-        drawIntensity(int.data);
-        drawPersistence(per.data);
-        drawSpreadTable(spr.data);
+        drawActivity(act.data || [], granularity);
+        drawIntensity(int.data || []);
+        drawPersistence(per.data || []);
+        drawSpreadTable(spr.data || []);
 
-        // Actualizar label de "Última actualización" con hora local
-        const lastUpd = await fetch('/last_update').then(r => r.json());
-        document.getElementById('last-update').innerText = `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
+        // Actualizar label de "Última actualización" con hora local (si existe el endpoint)
+        try {
+            const lastUpd = await fetch('/api/last_update').then(r => r.json());
+            if (lastUpd && lastUpd.last_update) {
+                document.getElementById('last-update').innerText = `Último scrapeo: ${formatToLocalTime(lastUpd.last_update)}`;
+            }
+        } catch (e) {
+            console.log("No se pudo obtener última actualización");
+        }
 
     } catch (e) {
         console.error("Error al refrescar dashboard:", e);
+        // alert("Error cargando datos. Revisa la consola.");
     } finally {
-        btn.innerText = 'Actualizar';
+        btn.innerText = originalText;
         btn.disabled = false;
     }
 }
@@ -311,10 +338,34 @@ async function refreshData() {
  * INICIO
  */
 
-// Setear fechas por defecto usando la función de fecha local
-const localToday = getLocalTodayString();
-document.getElementById('filter-date-from').value = localToday;
-document.getElementById('filter-date-to').value = localToday;
+// Función para inicializar la aplicación
+async function initApp() {
+    // Setear fechas por defecto
+    const localToday = getLocalTodayString();
+    const startEl = document.getElementById('startDate');
+    const endEl = document.getElementById('endDate');
+    
+    if(startEl) startEl.value = localToday;
+    if(endEl) endEl.value = localToday;
+
+    try {
+        // 1. Obtener la configuración del backend
+        const configResp = await fetch('/config');
+        if (configResp.ok) {
+            const config = await configResp.json();
+            API_BASE = config.api_base || "";
+        }
+        
+        console.log("Configuración cargada. API Base:", API_BASE);
+
+        // 2. Cargar datos iniciales
+        refreshData();
+        
+    } catch (error) {
+        console.error("Error init:", error);
+        refreshData();
+    }
+}
 
 // Listeners
 document.getElementById('btn-update').addEventListener('click', refreshData);
@@ -324,7 +375,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     const btn = document.getElementById('btn-ai');
     const container = document.getElementById('ai-response-container');
     const textField = document.getElementById('ai-text');
-    const paisSelector = document.getElementById('filter-pais');
+    const paisSelector = document.getElementById('countrySelect');
     const nombrePais = paisSelector.options[paisSelector.selectedIndex].text;
 
     if (!lastSpreadData || lastSpreadData.length === 0) {
@@ -334,10 +385,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
 
     // UI State
     btn.disabled = true;
-    btn.innerHTML = `
-        <svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        Analizando...
-    `;
+    btn.innerHTML = `Analizando...`;
     
     container.classList.remove('hidden');
     textField.innerText = "La IA está examinando las tendencias actuales...";
@@ -368,27 +416,5 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     }
 });
 
-// Función para inicializar la aplicación
-async function initApp() {
-    try {
-        // 1. Obtener la configuración del backend
-        const configResp = await fetch('/config');
-        const config = await configResp.json();
-        
-        // 2. Guardar la URL base
-        API_BASE = config.api_base;
-        console.log("Configuración cargada. API Base:", API_BASE);
-
-        // 3. Ahora que tenemos la IP, cargamos los datos por primera vez
-        refreshData();
-        
-    } catch (error) {
-        console.error("Error al cargar la configuración inicial:", error);
-        // Fallback por si acaso falla el endpoint
-        API_BASE = window.location.origin; 
-        refreshData();
-    }
-}
-
-// Cambiamos el window.onload por nuestra nueva función initApp
+// Arrancar
 window.addEventListener('load', initApp);
