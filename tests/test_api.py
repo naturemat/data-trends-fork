@@ -31,18 +31,13 @@ def client():
 
 def test_routes_exist(client):
     """
-    Prueba básica: Verificar que la app arranca y no da 404 en todo.
-    Intentamos acceder a una ruta que sepamos que existe.
+    Verifica que la API responda en la nueva ruta con prefijo.
     """
-    # Si tienes una ruta raíz '/', úsala. Si no, usa '/trends' o '/api/trends'
-    # Aquí probaremos '/trends' asumiendo que es tu ruta principal de datos
-    response = client.get('/trends')
+    # Cambiamos '/trends' por '/api/trends'
+    response = client.get('/api/trends')
     
-    # NOTA: Si tu ruta real es '/api/trends', cambia la línea de arriba.
-    
-    # Si devuelve 404, el test fallará y sabremos que la ruta está mal escrita
-    assert response.status_code != 404, "La ruta '/trends' no fue encontrada (Error 404)"
-
+    # Verificamos que NO sea 404 (o sea, que la ruta exista)
+    assert response.status_code != 404, "La API no responde en /api/trends"
 def test_trends_endpoint_structure(client):
     """
     Prueba de datos: Verificar que recibimos un JSON válido.
