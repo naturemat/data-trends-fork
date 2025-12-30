@@ -5,16 +5,15 @@ from app.routes import routes_blueprint
 def create_app():
     app = Flask(
         __name__,
-        # Mantenemos la configuración del frontend de tu amigo
+        # Mantenemos lo de tu amigo tal cual
         template_folder="../frontend",
         static_folder="../frontend",
         static_url_path=""
     )
+    CORS(app) 
     
-    CORS(app) # Habilita CORS
-    
-    # AQUI ESTA EL ARREGLO: Agregamos el prefijo /api
-    # Esto separa la web visual (/) de los datos (/api)
+    # --- CAMBIO IMPORTANTE AQUÍ ---
+    # Agrega url_prefix='/api' dentro del paréntesis
     app.register_blueprint(routes_blueprint, url_prefix='/api')
     
     return app
