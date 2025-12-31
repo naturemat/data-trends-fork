@@ -379,26 +379,23 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
 });
 
 // Función para inicializar la aplicación
+// Función para inicializar la aplicación
 async function initApp() {
     try {
-        // 1. Obtener la configuración del backend
         const configResp = await fetch('/api/config');
         const config = await configResp.json();
         
-        // 2. Guardar la URL base
-        API_BASE = config.api_base;
-        console.log("Configuración cargada. API Base:", API_BASE);
+        API_BASE = window.location.origin; 
+        
+        console.log("Configuración cargada. Usando API Base relativa:", API_BASE);
 
-        // 3. Ahora que tenemos la IP, cargamos los datos por primera vez
         refreshData();
         
     } catch (error) {
         console.error("Error al cargar la configuración inicial:", error);
-        // Fallback por si acaso falla el endpoint
         API_BASE = window.location.origin; 
         refreshData();
     }
 }
 
-// Cambiamos el window.onload por nuestra nueva función initApp
 window.addEventListener('load', initApp);
