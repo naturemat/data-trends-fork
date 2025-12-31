@@ -57,16 +57,13 @@ inputTo.addEventListener('change', () => {
 // Convierte UTC (de MongoDB) a Hora Local del Navegador
 function formatToLocalTime(isoString, showTime = true) {
     if (!isoString) return "--:--";
-
-    let normalizedString = isoString;
-    if (isoString.match(/\d{4}-\d{2}-\d{2}-\d{2}$/)) {
-        normalizedString = isoString.replace(/-(\d{2})$/, 'T$1:00:00');
-    }
-
-    const date = new Date(normalizedString);
     
-    // Si sigue siendo inválida, mostramos el string original para no romper la UI
+    const date = new Date(isoString);
     if (isNaN(date.getTime())) return isoString;
+
+    // RESTA MANUAL DE 5 HORAS (Ecuador UTC-5)
+    // Esto alinea el "04:00 UTC" con las "23:00 Local"
+    date.setHours(date.getHours() - 5);
 
     const options = { 
         day: '2-digit', 
@@ -74,34 +71,38 @@ function formatToLocalTime(isoString, showTime = true) {
     };
 
     if (showTime) {
-        options.hour = '2-digit',
-        options.minute = '2-digit',
-        options.hour12 = false
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+        options.hour12 = false;
     }
 
-    return date.toLocaleString([], options);
+    // Usamos UTC para que no aplique otra conversión automática encima
+    return date.toLocaleDateString([], { ...options, timeZone: 'UTC' });
 }
 
-function getUTCRange() {
-    const dateFromInput = document.getElementById('filter-date-from').value; //
-    const dateToInput = document.getElementById('filter-date-to').value;
-
-    const localFrom = new Date(dateFromInput + "T00:00:00");
-    const localTo = new Date(dateToInput + "T23:59:59");
-
-    return {
-        from: localFrom.toISOString(),
-        to: localTo.toISOString()
-    };
-}
-
-// Obtiene la fecha actual en formato YYYY-MM-DD respetando la zona horaria local
+// 2. Corregir el Calendario (Para que no salte al día siguiente antes de tiempo)
 function getLocalTodayString() {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // Restamos 5 horas al reloj del sistema para obtener el "Hoy" de Ecuador real
+    now.setHours(now.getHours() - 5); 
+    return now.toISOString().split('T')[0];
+}
+
+// 3. Corregir el Rango de consulta
+function getUTCRange() {
+    const dFrom = document.getElementById('filter-date-from').value; 
+    const dTo = document.getElementById('filter-date-to').value;
+
+    // Le sumamos 5 horas a la búsqueda para que MongoDB encuentre 
+    // los registros que están "adelantados" en UTC
+    const start = new Date(dFrom + "T00:00:00");
+    const end = new Date(dTo + "T23:59:59");
+    
+    // Al enviar .toISOString(), el backend buscará correctamente
+    return {
+        from: start.toISOString(),
+        to: end.toISOString()
+    };
 }
 
 // Decide granularidad basado en el rango de días seleccionados
@@ -132,7 +133,10 @@ const chartOptions = {
  */
 
 function drawActivity(data, granularity) {
-    const ctx = document.getElementById('chart-activity').getContext('2d');
+    const canvas = document.getElementById('chart-activity');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
     if (chartInstances.activity) chartInstances.activity.destroy();
 
     const showTime = (granularity === 'hour');
@@ -275,14 +279,14 @@ async function refreshData() {
     const pais = document.getElementById('filter-pais').value;
     const dFrom = document.getElementById('filter-date-from').value;
     const dTo = document.getElementById('filter-date-to').value;
+    
+    // Validación de rango
     if (new Date(dFrom) > new Date(dTo)) {
-        alert("La fecha de inicio ('Desde') no puede ser posterior a la fecha final ('Hasta').");
-        document.getElementById('filter-date-from').value = dTo;
+        alert("La fecha de inicio no puede ser posterior a la fecha final.");
         return; 
     }
 
     const granularity = getAutoGranularity(dFrom, dTo);
-
     const btn = document.getElementById('btn-update');
     btn.innerText = 'Cargando...';
     btn.disabled = true;
@@ -290,24 +294,26 @@ async function refreshData() {
     const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
-        // Usamos ${API_BASE} antes de cada ruta
-        const [act, int, per, spr] = await Promise.all([
+        const [act, int, per, spr, lastUpd] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/intensity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/persistence${params}`).then(r => r.json()),
-            fetch(`${API_BASE}/api/metrics/spread${params}`).then(r => r.json())
+            fetch(`${API_BASE}/api/metrics/spread${params}`).then(r => r.json()),
+            fetch(`${API_BASE}/api/last_update`).then(r => r.json())
         ]);
 
-        lastSpreadData = spr.data;
+        lastSpreadData = spr.data || [];
 
-        drawActivity(act.data, granularity);
-        drawIntensity(int.data);
-        drawPersistence(per.data);
-        drawSpreadTable(spr.data);
+        drawActivity(act.data || [], granularity);
+        drawIntensity(int.data || []);
+        drawPersistence(per.data || []);
+        drawSpreadTable(spr.data || []);
 
-        // Actualizar label de "Última actualización" con hora local
-        const lastUpd = await fetch('/api/last_update').then(r => r.json());
-        document.getElementById('last-update').innerText = `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
+        // Actualizar label de "Última actualización"
+        if (lastUpd.last_update) {
+            document.getElementById('last-update').innerText = 
+                `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
+        }
 
     } catch (e) {
         console.error("Error al refrescar dashboard:", e);

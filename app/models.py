@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional, List, Dict
 from app.db import db
 
-
 class Trend:
     """Modelo base para tendencias de Twitter."""
 
@@ -124,9 +123,11 @@ class Trend:
 
         result = list(cls.collection.aggregate(pipeline))
 
+        result = list(cls.collection.aggregate(pipeline))
+
         return [
             {
-                "timestamp": r["_id"],
+                "timestamp": r["_id"].isoformat(),
                 "total_trends": r["total_trends"]
             }
             for r in result
@@ -137,8 +138,8 @@ class Trend:
             cls,
             dt_from: datetime,
             dt_to: datetime,
-            pais: Optional[str] = "worldwide",  # Por defecto worldwide
-            granularity: str = "hour",  # hour | day
+            pais: Optional[str] = "worldwide",
+            granularity: str = "hour",
             limit: int = 20
         ) -> List[Dict]:
 
@@ -146,10 +147,7 @@ class Trend:
             raise ValueError("granularity must be 'hour' or 'day'")
 
         match = {
-            "scraped_at": {
-                "$gte": dt_from,
-                "$lte": dt_to
-            }
+            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
         }
 
         if pais and pais != "all":
@@ -157,7 +155,6 @@ class Trend:
 
         pipeline = [
             {"$match": match},
-
             {
                 "$addFields": {
                     "time_unit": {
@@ -168,7 +165,6 @@ class Trend:
                     }
                 }
             },
-
             {
                 "$group": {
                     "_id": "$tendencia",
@@ -177,23 +173,28 @@ class Trend:
                     "countries": {"$addToSet": "$pais"}
                 }
             },
-
             {
                 "$project": {
                     "_id": 0,
                     "trend": "$_id",
                     "appearances": 1,
                     "time_units_active": {"$size": "$time_units"},
-                    "countries": 1
+                    "countries": 1,
+                    "raw_time_units": "$time_units" 
                 }
             },
-
             {"$sort": {"appearances": -1}},
             {"$limit": limit}
         ]
 
-        return list(cls.collection.aggregate(pipeline))
-    
+        result = list(cls.collection.aggregate(pipeline))
+        
+        for r in result:
+            if "raw_time_units" in r:
+                r["raw_time_units"] = [t.isoformat() + "Z" for t in r["raw_time_units"]]
+                
+        return result
+
     @classmethod
     def aggregate_intensity(
         cls,

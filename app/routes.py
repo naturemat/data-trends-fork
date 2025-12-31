@@ -1,7 +1,7 @@
 """Flask route handlers for trends metrics API."""
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, render_template
 from app.models import Trend
 from openai import OpenAI
@@ -53,33 +53,24 @@ def parse_time_range(req):
         query = {"pais": pais} if (pais and pais != "all") else {}
         latest = Trend.collection.find_one(query, sort=[("scraped_at", -1)])
         
-        base_date = latest["scraped_at"] if latest else datetime.utcnow()
+        # Si no hay registros, usamos la hora actual menos 5 horas (Ecuador)
+        base_date = latest["scraped_at"] if latest else datetime.utcnow() - timedelta(hours=5)
         
         dt_from = base_date.replace(hour=0, minute=0, second=0, microsecond=0)
         dt_to = base_date.replace(hour=23, minute=59, second=59, microsecond=999999)
     else:
-        try:
-            dt_from = parser.parse(date_from_raw)
-            dt_to = parser.parse(date_to_raw)
-            
-        except Exception:
-            raise ValueError("Formato de fecha inválido. Se esperaba ISO 8601 o YYYY-MM-DD")
 
-    if dt_from > dt_to:
-        raise ValueError("La fecha de inicio no puede ser posterior a la de fin.")
+        dt_from = parser.parse(date_from_raw)
+        dt_to = parser.parse(date_to_raw)
 
-    return {
-        "pais": pais if (pais and pais != "all") else None,
-        "from": dt_from,
-        "to": dt_to
-    }
+    return {"pais": pais, "from": dt_from, "to": dt_to}
 
 # ---------------------------------------------------------------------
 # Metadata
 # ---------------------------------------------------------------------
 @routes_blueprint.get("/api/last_update")
 def last_update():
-    # Obtenemos el último documento
+    # Obtenemos el último documento guardado
     docs = Trend.find_all(limit=1)
 
     if not docs:
@@ -88,17 +79,15 @@ def last_update():
     last_doc = docs[0]
     scraped_at = last_doc.get("scraped_at")
 
-    # Convertimos a ISO 8601 en UTC con Z
+    # Si es un objeto datetime, lo enviamos como string ISO plano
     if scraped_at and isinstance(scraped_at, datetime):
-        # Asegurarnos que está en UTC
-        if scraped_at.tzinfo is None:
-            scraped_at = scraped_at.replace(tzinfo=timezone.utc)
-        scraped_at_str = scraped_at.isoformat().replace("+00:00", "Z")
+        # NO le pongas Z, NO le pongas zona horaria. 
+        # Solo el string para que el Front lo procese.
+        scraped_at_str = scraped_at.isoformat()
     else:
         scraped_at_str = None
 
     return jsonify({"last_update": scraped_at_str})
-
 
 # ---------------------------------------------------------------------
 # (Placeholder) Métricas
@@ -188,20 +177,20 @@ def spread_metric():
     limit = request.args.get("limit", default=50, type=int)
     pais = request.args.get("pais", default="worldwide")
 
-    dt_to = datetime.now()
-    dt_from = datetime(dt_to.year, dt_to.month, dt_to.day)
+    # CAMBIO: Iniciar dt_to en UTC real
+    dt_to = datetime.now(timezone.utc)
+    dt_from = dt_to.replace(hour=0, minute=0, second=0, microsecond=0)
 
     from_str = request.args.get("date_from") or request.args.get("from")
     to_str = request.args.get("date_to") or request.args.get("to")
 
     if from_str and to_str:
         try:
-            dt_from = datetime.fromisoformat(from_str) if 'T' in from_str else datetime.strptime(from_str, "%Y-%m-%d")
-            dt_to = datetime.fromisoformat(to_str) if 'T' in to_str else datetime.strptime(to_str, "%Y-%m-%d")
-            
-            if 'T' not in to_str:
-                dt_to = dt_to.replace(hour=23, minute=59, second=59)
-        except ValueError:
+            dt_from = parser.parse(from_str)
+            dt_to = parser.parse(to_str)
+            if dt_from.tzinfo is None: dt_from = dt_from.replace(tzinfo=timezone.utc)
+            if dt_to.tzinfo is None: dt_to = dt_to.replace(tzinfo=timezone.utc)
+        except Exception:
             return jsonify({"error": "Formato de fecha inválido"}), 400
 
     data = Trend.aggregate_spread(
@@ -212,8 +201,8 @@ def spread_metric():
     )
 
     return jsonify({
-        "desde": dt_from.isoformat(),
-        "hasta": dt_to.isoformat(),
+        "desde": dt_from.isoformat() + ("Z" if dt_from.tzinfo == timezone.utc else ""),
+        "hasta": dt_to.isoformat() + ("Z" if dt_to.tzinfo == timezone.utc else ""),
         "pais_consultado": pais,
         "data": data
     })
