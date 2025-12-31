@@ -57,16 +57,26 @@ inputTo.addEventListener('change', () => {
 // Convierte UTC (de MongoDB) a Hora Local del Navegador
 function formatToLocalTime(isoString, showTime = true) {
     if (!isoString) return "--:--";
-    const date = new Date(isoString);
+
+    let normalizedString = isoString;
+    if (isoString.match(/\d{4}-\d{2}-\d{2}-\d{2}$/)) {
+        normalizedString = isoString.replace(/-(\d{2})$/, 'T$1:00:00');
+    }
+
+    const date = new Date(normalizedString);
     
+    // Si sigue siendo inválida, mostramos el string original para no romper la UI
+    if (isNaN(date.getTime())) return isoString;
+
     const options = { 
         day: '2-digit', 
         month: 'short' 
     };
 
     if (showTime) {
-        options.hour = '2-digit';
-        options.minute = '2-digit';
+        options.hour = '2-digit',
+        options.minute = '2-digit',
+        options.hour12 = false
     }
 
     return date.toLocaleString([], options);
@@ -296,7 +306,7 @@ async function refreshData() {
         drawSpreadTable(spr.data);
 
         // Actualizar label de "Última actualización" con hora local
-        const lastUpd = await fetch('/last_update').then(r => r.json());
+        const lastUpd = await fetch('api/last_update').then(r => r.json());
         document.getElementById('last-update').innerText = `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
 
     } catch (e) {
@@ -372,7 +382,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
 async function initApp() {
     try {
         // 1. Obtener la configuración del backend
-        const configResp = await fetch('/config');
+        const configResp = await fetch('api/config');
         const config = await configResp.json();
         
         // 2. Guardar la URL base

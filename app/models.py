@@ -134,13 +134,13 @@ class Trend:
 
     @classmethod
     def aggregate_persistence(
-        cls,
-        dt_from: datetime,
-        dt_to: datetime,
-        pais: Optional[str] = None,
-        granularity: str = "hour",  # hour | day
-        limit: int = 20
-    ) -> List[Dict]:
+            cls,
+            dt_from: datetime,
+            dt_to: datetime,
+            pais: Optional[str] = "worldwide",  # Por defecto worldwide
+            granularity: str = "hour",  # hour | day
+            limit: int = 20
+        ) -> List[Dict]:
 
         if granularity not in ("hour", "day"):
             raise ValueError("granularity must be 'hour' or 'day'")
@@ -152,7 +152,7 @@ class Trend:
             }
         }
 
-        if pais:
+        if pais and pais != "all":
             match["pais"] = pais
 
         pipeline = [
@@ -249,31 +249,28 @@ class Trend:
         cls,
         dt_from: datetime,
         dt_to: datetime,
-        pais: str = "worldwide",  # Añadimos el parámetro pais
+        pais: str = "worldwide",
         limit: int = 50,
     ) -> List[Dict]:
         
-        # 1. Filtro base: Siempre por fecha
-        match_query = {
-            "scraped_at": {
-                "$gte": dt_from,
-                "$lte": dt_to
-            }
+        # 1. Filtro base de tiempo
+        match_time = {
+            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
         }
 
-        # 2. Si el usuario filtró por un país específico (que no sea global)
-        # primero buscamos qué tendencias existen en ese país.
-        if pais and pais != "worldwide":
-            # Obtenemos la lista de nombres de tendencias en ese país/rango
-            tendencias_locales = cls.collection.distinct("tendencia", {
-                **match_query,
-                "pais": pais
-            })
-            # Solo procesamos esas tendencias en el pipeline principal
-            match_query["tendencia"] = {"$in": tendencias_locales}
+        # 2. Obtener tendencias que REALMENTE estuvieron en el país consultado
+        filtro_local = {**match_time, "pais": pais} if pais and pais != "all" else match_time
+        tendencias_en_este_pais = cls.collection.distinct("tendencia", filtro_local)
 
+        # 3. Pipeline Principal
         pipeline = [
-            {"$match": match_query}, # Ahora el match es inteligente
+            # Filtramos para que solo analice las tendencias que pasaron por el país elegido
+            # pero permitimos que vea los registros de OTROS países para calcular el alcance
+            {"$match": {
+                **match_time,
+                "tendencia": {"$in": tendencias_en_este_pais}
+            }},
+            
             {
                 "$group": {
                     "_id": "$tendencia",
@@ -283,6 +280,8 @@ class Trend:
             },
             {
                 "$addFields": {
+                    # Solo marcamos in_worldwide si el país consultado es worldwide 
+                    # O si la tendencia aparece en esa lista específica
                     "in_worldwide": {"$in": ["worldwide", "$locations"]},
                     "countries": {
                         "$filter": {
@@ -298,8 +297,12 @@ class Trend:
                     "countries_count": {"$size": "$countries"},
                     "scope": {
                         "$cond": [
-                            "$in_worldwide", "global",
-                            {"$cond": [{"$gte": [{"$size": "$countries"}, 2]}, "regional", "local"]}
+                            # Lógica de Scope más realista:
+                            # Si está en Worldwide y en más de 5 países -> Global
+                            # Si está en más de 2 países -> Regional
+                            # Si solo está en 1 o 2 -> Local
+                            {"$and": [{"$in_worldwide": True}, {"$gte": [{"$size": "$locations"}, 5]}]}, "global",
+                            {"$cond": [{"$gte": [{"$size": "$locations"}, 3]}, "regional", "local"]}
                         ]
                     }
                 }
@@ -315,6 +318,7 @@ class Trend:
                     "appearances": 1
                 }
             },
+            # Ordenamos por las que tienen más presencia internacional
             {"$sort": {"countries_count": -1, "appearances": -1}},
             {"$limit": limit}
         ]
