@@ -25,7 +25,7 @@ client = OpenAI(
 # ---------------------------------------------------------------------
 # Configuración general
 # ---------------------------------------------------------------------
-API_BASE_URL = os.getenv("API_BASE_URL")
+API_BASE_URL = os.getenv("API_BASE_URL", "")
 
 @routes_blueprint.get("/api/config")
 def get_config():
