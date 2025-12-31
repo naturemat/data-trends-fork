@@ -3,11 +3,8 @@ import sys
 import os
 
 # --- Configuración de rutas ---
-# Esto permite importar modulos desde la carpeta superior 'scraper'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# --- IMPORTACIÓN CORRECTA ---
-# Importamos la función 'create_app' desde la carpeta 'app'
 try:
     from app import create_app
 except ImportError as e:
@@ -15,39 +12,43 @@ except ImportError as e:
 
 @pytest.fixture
 def client():
-    """
-    Configura un cliente de prueba de Flask.
-    Como usas 'create_app', debemos llamar a esa función primero.
-    """
-    # 1. Fabricamos la app
     app = create_app()
-    
-    # 2. Configuramos modo testing (importante para ver errores detallados)
     app.config['TESTING'] = True
-    
-    # 3. Entregamos el cliente para las pruebas
     with app.test_client() as client:
         yield client
 
-def test_routes_exist(client):
+def test_index_route(client):
     """
-    Verifica que la API responda en la nueva ruta con prefijo.
+    Verifica que la página principal (Frontend) cargue correctamente.
     """
-    # Cambiamos '/trends' por '/api/trends'
-    response = client.get('/api/trends')
+    response = client.get('/')
+    assert response.status_code == 200, "La ruta raíz '/' no funciona"
+
+def test_config_route(client):
+    """
+    Verifica que el endpoint de configuración para el frontend exista.
+    """
+    response = client.get('/config')
+    assert response.status_code == 200
+    assert response.is_json
+    data = response.get_json()
+    assert "api_base" in data, "El JSON de configuración debe incluir 'api_base'"
+
+def test_metrics_activity_exists(client):
+    """
+    Verifica que el endpoint de métricas de actividad responda (aunque sea con error de parámetros).
+    """
+    response = client.get('/api/metrics/activity')
     
-    # Verificamos que NO sea 404 (o sea, que la ruta exista)
-    assert response.status_code != 404, "La API no responde en /api/trends"
-def test_trends_endpoint_structure(client):
+    # Verificamos que NO sea 404. 
+    # Puede devolver 200 (éxito) o 400 (si faltan parámetros), 
+    # pero lo importante es que la ruta EXISTE.
+    assert response.status_code != 404, "El endpoint /api/metrics/activity no fue encontrado"
+
+def test_last_update_endpoint(client):
     """
-    Prueba de datos: Verificar que recibimos un JSON válido.
+    Verifica el endpoint de metadata.
     """
-    response = client.get('/trends')
-    
-    if response.status_code == 200:
-        assert response.is_json, "El endpoint debería devolver JSON"
-        data = response.get_json()
-        assert isinstance(data, list), "Se esperaba una lista de tendencias"
-        
-        # Opcional: Verificar que no esté vacío (solo pasará si ya escrapeaste datos)
-        # assert len(data) > 0, "La lista de tendencias está vacía"
+    response = client.get('/last_update')
+    assert response.status_code == 200
+    assert response.is_json
