@@ -252,25 +252,32 @@ class Trend:
         pais: str = "worldwide",
         limit: int = 50,
     ) -> List[Dict]:
+        """
+        Analiza el alcance global/regional/local de las tendencias.
+        Nueva lógica: 
+        - GLOBAL: Si está en 'worldwide' O aparece en >= 10 países.
+        - REGIONAL: Si aparece en >= 3 países.
+        - LOCAL: Resto de casos.
+        """
         
-        # 1. Filtro base de tiempo
         match_time = {
             "scraped_at": {"$gte": dt_from, "$lte": dt_to}
         }
 
-        # 2. Obtener tendencias que REALMENTE estuvieron en el país consultado
+        # 1. Identificar tendencias presentes en el país seleccionado
         filtro_local = {**match_time, "pais": pais} if pais and pais != "all" else match_time
         tendencias_en_este_pais = cls.collection.distinct("tendencia", filtro_local)
 
-        # 3. Pipeline Principal
+        if not tendencias_en_este_pais:
+            return []
+
         pipeline = [
-            # Filtramos para que solo analice las tendencias que pasaron por el país elegido
-            # pero permitimos que vea los registros de OTROS países para calcular el alcance
-            {"$match": {
-                **match_time,
-                "tendencia": {"$in": tendencias_en_este_pais}
-            }},
-            
+            {
+                "$match": {
+                    **match_time,
+                    "tendencia": {"$in": tendencias_en_este_pais}
+                }
+            },
             {
                 "$group": {
                     "_id": "$tendencia",
@@ -280,8 +287,6 @@ class Trend:
             },
             {
                 "$addFields": {
-                    # Solo marcamos in_worldwide si el país consultado es worldwide 
-                    # O si la tendencia aparece en esa lista específica
                     "in_worldwide": {"$in": ["worldwide", "$locations"]},
                     "countries": {
                         "$filter": {
@@ -297,12 +302,18 @@ class Trend:
                     "countries_count": {"$size": "$countries"},
                     "scope": {
                         "$cond": [
-                            # Lógica de Scope más realista:
-                            # Si está en Worldwide y en más de 5 países -> Global
-                            # Si está en más de 2 países -> Regional
-                            # Si solo está en 1 o 2 -> Local
-                            {"$and": [{"$in_worldwide": True}, {"$gte": [{"$size": "$locations"}, 5]}]}, "global",
-                            {"$cond": [{"$gte": [{"$size": "$locations"}, 3]}, "regional", "local"]}
+                            # REGLA GLOBAL: Aparece en Worldwide O tiene 10 o más países
+                            {"$or": [
+                                {"$eq": ["$in_worldwide", True]}, 
+                                {"$gte": [{"$size": "$countries"}, 10]}
+                            ]}, 
+                            "global",
+                            # REGLA REGIONAL: 3 o más locaciones en total
+                            {"$cond": [
+                                {"$gte": [{"$size": "$locations"}, 3]}, 
+                                "regional", 
+                                "local"
+                            ]}
                         ]
                     }
                 }
@@ -318,7 +329,6 @@ class Trend:
                     "appearances": 1
                 }
             },
-            # Ordenamos por las que tienen más presencia internacional
             {"$sort": {"countries_count": -1, "appearances": -1}},
             {"$limit": limit}
         ]
