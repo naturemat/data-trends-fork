@@ -30,7 +30,6 @@ x-trends-scraper/
 ├── frontend/         # Interfaz web del dashboard
 │   ├── index.html    # Página principal
 │   ├── assets/       # Recursos estáticos como imágenes
-│   ├── css/          # Hojas de estilo
 │   └── js/           # Scripts de frontend
 ├── drivers/          # Drivers para scraping
 ├── main.py           # Ejecutar scraper
@@ -99,7 +98,11 @@ python scripts/demo_api.py
 - POST `/trends` – Crear tendencia manual
 - POST `/trends/bulk` – Insertar múltiples tendencias
 - GET `/last_update` – Última actualización del scraping
-- POST `/ai_summary` – Generar resumen de tendencias con IA
+- GET `/api/metrics/activity` – Actividad temporal de tendencias (volumen de registros por hora/día).
+- GET `/api/metrics/intensity` – Comparativa de volumen de tweets (máximos y promedios).
+- GET `/api/metrics/persistence` – Frecuencia de aparición de temas en el tiempo.
+- GET `/api/metrics/spread` – Alcance geográfico y nivel de difusión (Local, Regional, Global).
+- POST `api/ai_summary` – Generar resumen de tendencias con IA
 - GET `/config` – Obtiene la configuración pública para el frontend
 
 ## Variables de entorno
