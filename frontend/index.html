@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/assets/logo.png">
-    <img src="/assets/logo.png" alt="Logo" class="h-12 w-auto object-contain">
     <title>DataTrendX</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -24,9 +23,7 @@
 
     <header class="bg-white shadow-sm border-b sticky top-0 z-10 p-4">
         <div class="max-w-7xl mx-auto flex flex-wrap gap-4 items-end justify-between">
-            <img src="{{ url_for('static', filename='assets/logo.png') }}" 
-                 alt="Logo" 
-                 class="h-12 w-auto object-contain">
+            <img src="/assets/logo.png" alt="Logo" class="h-12 w-auto object-contain">
             <div>
                 <h1 class="text-xl font-bold text-blue-600">DataTrendX</h1>
                 <p class="text-xs text-slate-500" id="last-update">Actualizando...</p>
