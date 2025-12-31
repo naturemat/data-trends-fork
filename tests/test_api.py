@@ -28,7 +28,7 @@ def test_config_route(client):
     """
     Verifica que el endpoint de configuración para el frontend exista.
     """
-    response = client.get('/config')
+    response = client.get('api/config')
     assert response.status_code == 200
     assert response.is_json
     data = response.get_json()
@@ -49,6 +49,6 @@ def test_last_update_endpoint(client):
     """
     Verifica el endpoint de metadata.
     """
-    response = client.get('/last_update')
+    response = client.get('api/last_update')
     assert response.status_code == 200
     assert response.is_json

@@ -25,9 +25,9 @@ client = OpenAI(
 # ---------------------------------------------------------------------
 # Configuración general
 # ---------------------------------------------------------------------
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5000")
+API_BASE_URL = os.getenv("API_BASE_URL")
 
-@routes_blueprint.get("/config")
+@routes_blueprint.get("api/config")
 def get_config():
     """Devuelve configuración pública para el frontend."""
     return jsonify({
@@ -77,7 +77,7 @@ def parse_time_range(req):
 # ---------------------------------------------------------------------
 # Metadata
 # ---------------------------------------------------------------------
-@routes_blueprint.get("/last_update")
+@routes_blueprint.get("api/last_update")
 def last_update():
     # Obtenemos el último documento
     docs = Trend.find_all(limit=1)
