@@ -1,160 +1,322 @@
+"""MongoDB document models."""
+
+from datetime import datetime
+from typing import Optional, List, Dict
 from app.db import db
-from datetime import datetime, timezone
+
 
 class Trend:
-    # Referencia a la colección en MongoDB
+    """Modelo base para tendencias de Twitter."""
+
     collection = db.trends
 
-    @classmethod
-    def create(cls, data):
-        """Crea un nuevo documento."""
-        return cls.collection.insert_one(data)
+    def __init__(self, data: Dict):
+        self.id = data.get("_id")
+        self.fecha = data.get("fecha")
+        self.hora = data.get("hora")
+        self.tendencia = data.get("tendencia")
+        self.numeroDeTwits = data.get("numeroDeTwits")
+        self.pais = data.get("pais")
+        self.scraped_at = data.get("scraped_at")
+
+    # ---------- CREACIÓN ----------
+
+    @staticmethod
+    def create_document(
+        tendencia: str,
+        numeroDeTwits: Optional[int] = None,
+        pais: str = "worldwide"
+    ) -> Dict:
+        now = datetime.now()
+        return {
+            "fecha": now.strftime("%Y-%m-%d"),
+            "hora": now.strftime("%H:%M:%S"),
+            "tendencia": tendencia,
+            "numeroDeTwits": numeroDeTwits,
+            "pais": pais,
+            "scraped_at": now
+        }
 
     @classmethod
-    def find_all(cls, query={}, limit=0):
-        """Busca documentos básicos."""
-        cursor = cls.collection.find(query).sort("scraped_at", -1)
-        if limit > 0:
+    def insert_one(cls, document: Dict):
+        return cls.collection.insert_one(document)
+
+    # ---------- CONSULTAS BÁSICAS ----------
+
+    @classmethod
+    def find_all(cls, limit: Optional[int] = None) -> List[Dict]:
+        cursor = cls.collection.find().sort("scraped_at", -1)
+        if limit:
             cursor = cursor.limit(limit)
         return list(cursor)
 
-    # --- AQUÍ ESTÁN LAS FUNCIONES QUE FALTABAN (LAS QUE DABAN ERROR 500) ---
+    @classmethod
+    def find_by_country(
+        cls,
+        pais: str,
+        limit: Optional[int] = None
+    ) -> List[Dict]:
+        cursor = cls.collection.find(
+            {"pais": pais}
+        ).sort("scraped_at", -1)
+        if limit:
+            cursor = cursor.limit(limit)
+        return list(cursor)
 
     @classmethod
-    def aggregate_activity(cls, pais, dt_from, dt_to, granularity="hour"):
-        """Calcula el volumen de tendencias por hora/día."""
-        match_stage = {
-            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
+    def find_by_date_range(
+        cls,
+        fecha_inicio: str,
+        fecha_fin: str,
+        pais: Optional[str] = None
+    ) -> List[Dict]:
+        query = {
+            "fecha": {"$gte": fecha_inicio, "$lte": fecha_fin}
         }
-        if pais and pais != "worldwide" and pais != "all":
-            match_stage["pais"] = pais
 
-        # Formato de fecha para agrupar (Mongo syntax)
-        date_format = "%Y-%m-%d-%H" if granularity == "hour" else "%Y-%m-%d"
+        if pais:
+            query["pais"] = pais
+
+        return list(
+            cls.collection.find(query).sort("scraped_at", -1)
+        )
+    
+    # ---------- METRICAS PARA EL FRONT ----------
+    @classmethod
+    def aggregate_activity(
+        cls,
+        pais,
+        dt_from,
+        dt_to,
+        granularity="hour"
+    ):
+        """
+        Métrica de actividad temporal:
+        - Conteo de tendencias por hora o por día
+        - Incluye tendencias con numeroDeTwits = null
+        """
+
+        if granularity not in ("hour", "day"):
+            raise ValueError("granularity debe ser 'hour' o 'day'")
 
         pipeline = [
-            {"$match": match_stage},
+            {
+                "$match": {
+                    "pais": pais,
+                    "scraped_at": {"$gte": dt_from, "$lte": dt_to}
+                }
+            },
             {
                 "$group": {
                     "_id": {
-                        "$dateToString": {"format": date_format, "date": "$scraped_at"}
+                        "$dateTrunc": {"date": "$scraped_at", "unit": granularity}
                     },
-                    "total_trends": {"$sum": 1}
+                    "trends_set": {"$addToSet": "$tendencia"}  # guardamos solo tendencias únicas
                 }
             },
-            {"$sort": {"_id": 1}},
             {
                 "$project": {
-                    "_id": 0,
-                    "timestamp": "$_id",
-                    "total_trends": 1
-                }
-            }
-        ]
-        return list(cls.collection.aggregate(pipeline))
-
-    @classmethod
-    def aggregate_intensity(cls, dt_from, dt_to, pais, limit=20):
-        """Calcula Max vs Promedio de tweets por tendencia."""
-        match_stage = {
-            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
-        }
-        if pais and pais != "worldwide" and pais != "all":
-            match_stage["pais"] = pais
-
-        pipeline = [
-            {"$match": match_stage},
-            {
-                "$group": {
-                    "_id": "$tendencia",
-                    "max_tweets": {"$max": "$numeroDeTwits"},
-                    "avg_tweets": {"$avg": "$numeroDeTwits"},
-                    "count": {"$sum": 1}
+                    "total_trends": {"$size": "$trends_set"}  # contamos cuántas únicas
                 }
             },
-            {"$sort": {"max_tweets": -1}},
-            {"$limit": limit},
-            {
-                "$project": {
-                    "_id": 0,
-                    "trend": "$_id",
-                    "max_tweets": 1,
-                    "avg_tweets": {"$round": ["$avg_tweets", 0]}
-                }
-            }
+            {"$sort": {"_id": 1}}
         ]
-        return list(cls.collection.aggregate(pipeline))
+
+        result = list(cls.collection.aggregate(pipeline))
+
+        return [
+            {
+                "timestamp": r["_id"],
+                "total_trends": r["total_trends"]
+            }
+            for r in result
+        ]
 
     @classmethod
-    def aggregate_persistence(cls, dt_from, dt_to, pais, granularity, limit=20):
-        """Cuenta cuántas veces apareció una tendencia (frecuencia)."""
-        match_stage = {
-            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
+    def aggregate_persistence(
+        cls,
+        dt_from: datetime,
+        dt_to: datetime,
+        pais: Optional[str] = None,
+        granularity: str = "hour",  # hour | day
+        limit: int = 20
+    ) -> List[Dict]:
+
+        if granularity not in ("hour", "day"):
+            raise ValueError("granularity must be 'hour' or 'day'")
+
+        match = {
+            "scraped_at": {
+                "$gte": dt_from,
+                "$lte": dt_to
+            }
         }
-        if pais and pais != "worldwide" and pais != "all":
-            match_stage["pais"] = pais
+
+        if pais:
+            match["pais"] = pais
 
         pipeline = [
-            {"$match": match_stage},
+            {"$match": match},
+
+            {
+                "$addFields": {
+                    "time_unit": {
+                        "$dateTrunc": {
+                            "date": "$scraped_at",
+                            "unit": granularity
+                        }
+                    }
+                }
+            },
+
             {
                 "$group": {
                     "_id": "$tendencia",
                     "appearances": {"$sum": 1},
-                    "last_seen": {"$max": "$scraped_at"}
+                    "time_units": {"$addToSet": "$time_unit"},
+                    "countries": {"$addToSet": "$pais"}
                 }
             },
-            {"$sort": {"appearances": -1}},
-            {"$limit": limit},
+
             {
                 "$project": {
                     "_id": 0,
                     "trend": "$_id",
-                    "appearances": 1
+                    "appearances": 1,
+                    "time_units_active": {"$size": "$time_units"},
+                    "countries": 1
                 }
-            }
-        ]
-        return list(cls.collection.aggregate(pipeline))
+            },
 
+            {"$sort": {"appearances": -1}},
+            {"$limit": limit}
+        ]
+
+        return list(cls.collection.aggregate(pipeline))
+    
     @classmethod
-    def aggregate_spread(cls, dt_from, dt_to, pais, limit=50):
-        """Analiza en cuántos países aparece cada tendencia."""
-        match_stage = {
-            "scraped_at": {"$gte": dt_from, "$lte": dt_to}
+    def aggregate_intensity(
+        cls,
+        dt_from: datetime,
+        dt_to: datetime,
+        pais: Optional[str] = None,
+        limit: int = 20
+    ) -> List[Dict]:
+
+        match = {
+            "scraped_at": {
+                "$gte": dt_from,
+                "$lte": dt_to
+            },
+            "numeroDeTwits": {"$ne": None}
         }
-        
+
+        if pais:
+            match["pais"] = pais
+
         pipeline = [
-            {"$match": match_stage},
+            {"$match": match},
+
             {
                 "$group": {
                     "_id": "$tendencia",
-                    "countries": {"$addToSet": "$pais"},
-                    "tweet_volume": {"$max": "$numeroDeTwits"}
+                    "avg_tweets": {"$avg": "$numeroDeTwits"},
+                    "max_tweets": {"$max": "$numeroDeTwits"},
+                    "samples": {"$sum": 1},
+                    "countries": {"$addToSet": "$pais"}
                 }
             },
+
             {
                 "$project": {
+                    "_id": 0,
                     "trend": "$_id",
-                    "countries": 1,
-                    "countries_count": {"$size": "$countries"},
-                    "tweet_volume": 1,
-                    "_id": 0
+                    "avg_tweets": {"$round": ["$avg_tweets", 0]},
+                    "max_tweets": 1,
+                    "samples": 1,
+                    "countries": 1
                 }
             },
-            {"$sort": {"countries_count": -1, "tweet_volume": -1}},
-            {"$limit": limit},
+
+            {"$sort": {"avg_tweets": -1}},
+            {"$limit": limit}
+        ]
+
+        return list(cls.collection.aggregate(pipeline))
+    
+    @classmethod
+    def aggregate_spread(
+        cls,
+        dt_from: datetime,
+        dt_to: datetime,
+        pais: str = "worldwide",  # Añadimos el parámetro pais
+        limit: int = 50,
+    ) -> List[Dict]:
+        
+        # 1. Filtro base: Siempre por fecha
+        match_query = {
+            "scraped_at": {
+                "$gte": dt_from,
+                "$lte": dt_to
+            }
+        }
+
+        # 2. Si el usuario filtró por un país específico (que no sea global)
+        # primero buscamos qué tendencias existen en ese país.
+        if pais and pais != "worldwide":
+            # Obtenemos la lista de nombres de tendencias en ese país/rango
+            tendencias_locales = cls.collection.distinct("tendencia", {
+                **match_query,
+                "pais": pais
+            })
+            # Solo procesamos esas tendencias en el pipeline principal
+            match_query["tendencia"] = {"$in": tendencias_locales}
+
+        pipeline = [
+            {"$match": match_query}, # Ahora el match es inteligente
+            {
+                "$group": {
+                    "_id": "$tendencia",
+                    "locations": {"$addToSet": "$pais"},
+                    "appearances": {"$sum": 1}
+                }
+            },
+            {
+                "$addFields": {
+                    "in_worldwide": {"$in": ["worldwide", "$locations"]},
+                    "countries": {
+                        "$filter": {
+                            "input": "$locations",
+                            "as": "p",
+                            "cond": {"$ne": ["$$p", "worldwide"]}
+                        }
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "countries_count": {"$size": "$countries"},
+                    "scope": {
+                        "$cond": [
+                            "$in_worldwide", "global",
+                            {"$cond": [{"$gte": [{"$size": "$countries"}, 2]}, "regional", "local"]}
+                        ]
+                    }
+                }
+            },
             {
                 "$project": {
-                    "trend": 1,
+                    "_id": 0,
+                    "trend": "$_id",
+                    "scope": 1,
                     "countries": 1,
-                    "scope": {
-                        "$cond": {
-                            "if": {"$gt": ["$countries_count", 1]},
-                            "then": "global",
-                            "else": "local"
-                        }
-                    },
-                    "in_worldwide": {"$in": ["worldwide", "$countries"]}
+                    "countries_count": 1,
+                    "in_worldwide": 1,
+                    "appearances": 1
                 }
-            }
+            },
+            {"$sort": {"countries_count": -1, "appearances": -1}},
+            {"$limit": limit}
         ]
+
         return list(cls.collection.aggregate(pipeline))
