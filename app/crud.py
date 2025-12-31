@@ -1,11 +1,10 @@
 """CRUD operations for MongoDB (Trend collection)."""
 
 from typing import List, Dict, Any, Optional
-
 from app.models import Trend
 
 # ---------------------------------------------------------------------
-# Create
+# Create (Individual)
 # ---------------------------------------------------------------------
 def create_trend(
     tendencia: str,
@@ -13,60 +12,19 @@ def create_trend(
     pais: str = "worldwide",
 ) -> str:
     """Inserta una tendencia manual en la base de datos."""
-
+    # Usamos el método estático que ya tienes en models.py
     document = Trend.create_document(tendencia, numeroDeTwits, pais)
     result = Trend.insert_one(document)
     return str(result.inserted_id)
 
 
 # ---------------------------------------------------------------------
-# Read
-# ---------------------------------------------------------------------
-def get_trends(limit: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Obtiene todas las tendencias, opcionalmente con límite."""
-
-    trends = Trend.find_all(limit)
-    _stringify_ids(trends)
-    return trends
-
-
-def get_trends_by_country(
-    pais: str,
-    limit: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    """Obtiene tendencias filtradas por país."""
-
-    trends = Trend.find_by_country(pais, limit)
-    _stringify_ids(trends)
-    return trends
-
-
-def get_trends_by_date_range(
-    fecha_inicio: str,
-    fecha_fin: str,
-    limit: Optional[int] = None,
-) -> List[Dict[str, Any]]:
-    """Obtiene tendencias dentro de un rango de fechas."""
-
-    trends = Trend.find_by_date_range(fecha_inicio, fecha_fin, limit)
-    _stringify_ids(trends)
-    return trends
-
-
-def get_latest_per_day(pais: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Obtiene el último registro por día, opcionalmente filtrado por país."""
-
-    trends = Trend.find_latest_per_day(pais)
-    _stringify_ids(trends)
-    return trends
-
-
-# ---------------------------------------------------------------------
-# Bulk insert
+# Bulk insert (EL QUE USA EL SCRAPER)
 # ---------------------------------------------------------------------
 def save_scraped_trends(trends_data: List[Dict[str, Any]]) -> int:
     """Guarda múltiples tendencias obtenidas por el scraper."""
 
+    # Generamos los documentos usando tu método estático de models.py
     documents = [
         Trend.create_document(
             tendencia=trend.get("trend"),
@@ -80,16 +38,30 @@ def save_scraped_trends(trends_data: List[Dict[str, Any]]) -> int:
     if not documents:
         return 0
 
+    # Usamos la colección directamente desde la clase Trend
     result = Trend.collection.insert_many(documents)
     return len(result.inserted_ids)
 
 
 # ---------------------------------------------------------------------
-# Utils
+# Read y Utils
 # ---------------------------------------------------------------------
-def _stringify_ids(trends: List[Dict[str, Any]]) -> None:
-    """Convierte ObjectId a string para serialización JSON."""
+def get_trends(limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    trends = Trend.find_all(limit)
+    _stringify_ids(trends)
+    return trends
 
+def get_trends_by_country(pais: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    trends = Trend.find_by_country(pais, limit)
+    _stringify_ids(trends)
+    return trends
+
+def get_trends_by_date_range(fecha_inicio: str, fecha_fin: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    trends = Trend.find_by_date_range(fecha_inicio, fecha_fin, limit)
+    _stringify_ids(trends)
+    return trends
+
+def _stringify_ids(trends: List[Dict[str, Any]]) -> None:
     for trend in trends:
         if "_id" in trend:
             trend["_id"] = str(trend["_id"])
