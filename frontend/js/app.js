@@ -55,19 +55,16 @@ inputTo.addEventListener('change', () => {
 });
 
 // Convierte UTC (de MongoDB) a Hora Local del Navegador
+// 1. Forzar visualización en UTC
 function formatToLocalTime(isoString, showTime = true) {
     if (!isoString) return "--:--";
     
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return isoString;
 
-    // RESTA MANUAL DE 5 HORAS (Ecuador UTC-5)
-    // Esto alinea el "04:00 UTC" con las "23:00 Local"
-    date.setHours(date.getHours() - 5);
-
     const options = { 
         day: '2-digit', 
-        month: 'short' 
+        month: 'short'
     };
 
     if (showTime) {
@@ -76,32 +73,21 @@ function formatToLocalTime(isoString, showTime = true) {
         options.hour12 = false;
     }
 
-    // Usamos UTC para que no aplique otra conversión automática encima
-    return date.toLocaleDateString([], { ...options, timeZone: 'UTC' });
+    return date.toLocaleDateString('es-ES', options);
 }
 
-// 2. Corregir el Calendario (Para que no salte al día siguiente antes de tiempo)
 function getLocalTodayString() {
     const now = new Date();
-    // Restamos 5 horas al reloj del sistema para obtener el "Hoy" de Ecuador real
-    now.setHours(now.getHours() - 5); 
     return now.toISOString().split('T')[0];
 }
 
-// 3. Corregir el Rango de consulta
 function getUTCRange() {
     const dFrom = document.getElementById('filter-date-from').value; 
     const dTo = document.getElementById('filter-date-to').value;
 
-    // Le sumamos 5 horas a la búsqueda para que MongoDB encuentre 
-    // los registros que están "adelantados" en UTC
-    const start = new Date(dFrom + "T00:00:00");
-    const end = new Date(dTo + "T23:59:59");
-    
-    // Al enviar .toISOString(), el backend buscará correctamente
     return {
-        from: start.toISOString(),
-        to: end.toISOString()
+        from: `${dFrom}T00:00:00`,
+        to: `${dTo}T23:59:59`
     };
 }
 
@@ -146,16 +132,27 @@ function drawActivity(data, granularity) {
         data: {
             labels: data.map(d => formatToLocalTime(d.timestamp, showTime)),
             datasets: [{
-                label: 'Tendencias Activas',
+                label: 'Tendencias Únicas Detectadas',
                 data: data.map(d => d.total_trends),
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37, 99, 235, 0.1)',
                 fill: true,
                 tension: 0.3,
-                pointRadius: 2
+                pointRadius: 3,
+                pointHoverRadius: 5
             }]
         },
-        options: chartOptions
+        options: {
+            ...chartOptions,
+            plugins: {
+                ...chartOptions.plugins,
+                tooltip: {
+                    callbacks: {
+                        title: (items) => `Fecha/Hora: ${items[0].label}`
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -291,7 +288,8 @@ async function refreshData() {
     btn.innerText = 'Cargando...';
     btn.disabled = true;
 
-    const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
+    // Dentro de refreshData, la línea de params queda así:
+const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
         const [act, int, per, spr, lastUpd] = await Promise.all([

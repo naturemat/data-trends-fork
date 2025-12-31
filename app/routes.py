@@ -49,19 +49,29 @@ def parse_time_range(req):
     date_from_raw = req.args.get("date_from")
     date_to_raw = req.args.get("date_to")
     
+    # Definimos el ajuste: Ecuador está 5 horas detrás de UTC
+    # Para consultar la DB (UTC), sumamos 5 horas a la hora local deseada
+    offset = timedelta(hours=5)
+    
     if not date_from_raw or not date_to_raw:
         query = {"pais": pais} if (pais and pais != "all") else {}
         latest = Trend.collection.find_one(query, sort=[("scraped_at", -1)])
         
-        # Si no hay registros, usamos la hora actual menos 5 horas (Ecuador)
-        base_date = latest["scraped_at"] if latest else datetime.utcnow() - timedelta(hours=5)
-        
-        dt_from = base_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        dt_to = base_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    else:
+        # Dentro de if not date_from_raw:
+        base_date_utc = latest["scraped_at"] if latest else datetime.utcnow()
+        # 1. Convertimos a Ecuador primero
+        base_date_ec = base_date_utc - timedelta(hours=5)
 
-        dt_from = parser.parse(date_from_raw)
-        dt_to = parser.parse(date_to_raw)
+        # 2. Seteamos inicio y fin del día NATURAL de Ecuador
+        dt_from_local = base_date_ec.replace(hour=0, minute=0, second=0, microsecond=0)
+        dt_to_local = base_date_ec.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        # 3. Enviamos a la DB sumando 5 para buscar en UTC
+        dt_from = dt_from_local + timedelta(hours=5)
+        dt_to = dt_to_local + timedelta(hours=5)
+    else:
+        dt_from = parser.parse(date_from_raw).replace(tzinfo=None) + offset
+        dt_to = parser.parse(date_to_raw).replace(tzinfo=None) + offset
 
     return {"pais": pais, "from": dt_from, "to": dt_to}
 
@@ -70,20 +80,15 @@ def parse_time_range(req):
 # ---------------------------------------------------------------------
 @routes_blueprint.get("/api/last_update")
 def last_update():
-    # Obtenemos el último documento guardado
     docs = Trend.find_all(limit=1)
-
     if not docs:
         return jsonify({"last_update": None})
 
     last_doc = docs[0]
     scraped_at = last_doc.get("scraped_at")
 
-    # Si es un objeto datetime, lo enviamos como string ISO plano
     if scraped_at and isinstance(scraped_at, datetime):
-        # NO le pongas Z, NO le pongas zona horaria. 
-        # Solo el string para que el Front lo procese.
-        scraped_at_str = scraped_at.isoformat()
+        scraped_at_str = scraped_at.isoformat() + "Z"
     else:
         scraped_at_str = None
 
@@ -176,22 +181,23 @@ def intensity_metric():
 def spread_metric():
     limit = request.args.get("limit", default=50, type=int)
     pais = request.args.get("pais", default="worldwide")
-
-    # CAMBIO: Iniciar dt_to en UTC real
-    dt_to = datetime.now(timezone.utc)
-    dt_from = dt_to.replace(hour=0, minute=0, second=0, microsecond=0)
+    offset = timedelta(hours=5)
 
     from_str = request.args.get("date_from") or request.args.get("from")
     to_str = request.args.get("date_to") or request.args.get("to")
 
     if from_str and to_str:
         try:
-            dt_from = parser.parse(from_str)
-            dt_to = parser.parse(to_str)
-            if dt_from.tzinfo is None: dt_from = dt_from.replace(tzinfo=timezone.utc)
-            if dt_to.tzinfo is None: dt_to = dt_to.replace(tzinfo=timezone.utc)
+            # Sumamos el offset para buscar en la DB que es UTC
+            dt_from = parser.parse(from_str).replace(tzinfo=None) + offset
+            dt_to = parser.parse(to_str).replace(tzinfo=None) + offset
         except Exception:
             return jsonify({"error": "Formato de fecha inválido"}), 400
+    else:
+        # Por defecto: hoy en Ecuador (traducido a UTC para la DB)
+        ahora_ec = datetime.utcnow() - offset
+        dt_from = ahora_ec.replace(hour=0, minute=0, second=0, microsecond=0) + offset
+        dt_to = ahora_ec.replace(hour=23, minute=59, second=59, microsecond=999999) + offset
 
     data = Trend.aggregate_spread(
         dt_from=dt_from,

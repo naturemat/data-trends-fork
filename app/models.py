@@ -89,12 +89,6 @@ class Trend:
         dt_to,
         granularity="hour"
     ):
-        """
-        Métrica de actividad temporal:
-        - Conteo de tendencias por hora o por día
-        - Incluye tendencias con numeroDeTwits = null
-        """
-
         if granularity not in ("hour", "day"):
             raise ValueError("granularity debe ser 'hour' o 'day'")
 
@@ -108,14 +102,19 @@ class Trend:
             {
                 "$group": {
                     "_id": {
-                        "$dateTrunc": {"date": "$scraped_at", "unit": granularity}
+                        # Cambio: Agregamos timezone para que la hora 00:00 sea la de Ecuador
+                        "$dateTrunc": {
+                            "date": "$scraped_at", 
+                            "unit": granularity,
+                            "timezone": "-05:00"
+                        }
                     },
-                    "trends_set": {"$addToSet": "$tendencia"}  # guardamos solo tendencias únicas
+                    "trends_set": {"$addToSet": "$tendencia"}
                 }
             },
             {
                 "$project": {
-                    "total_trends": {"$size": "$trends_set"}  # contamos cuántas únicas
+                    "total_trends": {"$size": "$trends_set"}
                 }
             },
             {"$sort": {"_id": 1}}
@@ -123,11 +122,10 @@ class Trend:
 
         result = list(cls.collection.aggregate(pipeline))
 
-        result = list(cls.collection.aggregate(pipeline))
-
         return [
             {
-                "timestamp": r["_id"].isoformat(),
+                # Añadimos .isoformat() + "Z" para que el JS sepa que es UTC
+                "timestamp": r["_id"].isoformat() + "Z" if isinstance(r["_id"], datetime) else r["_id"],
                 "total_trends": r["total_trends"]
             }
             for r in result
@@ -135,13 +133,13 @@ class Trend:
 
     @classmethod
     def aggregate_persistence(
-            cls,
-            dt_from: datetime,
-            dt_to: datetime,
-            pais: Optional[str] = "worldwide",
-            granularity: str = "hour",
-            limit: int = 20
-        ) -> List[Dict]:
+        cls,
+        dt_from: datetime,
+        dt_to: datetime,
+        pais: Optional[str] = "worldwide",
+        granularity: str = "hour",
+        limit: int = 20
+    ) -> List[Dict]:
 
         if granularity not in ("hour", "day"):
             raise ValueError("granularity must be 'hour' or 'day'")
@@ -158,9 +156,11 @@ class Trend:
             {
                 "$addFields": {
                     "time_unit": {
+                        # Cambio: Agregamos timezone para definir el bloque de tiempo local
                         "$dateTrunc": {
                             "date": "$scraped_at",
-                            "unit": granularity
+                            "unit": granularity,
+                            "timezone": "-05:00"
                         }
                     }
                 }
@@ -168,7 +168,6 @@ class Trend:
             {
                 "$group": {
                     "_id": "$tendencia",
-                    "appearances": {"$sum": 1},
                     "time_units": {"$addToSet": "$time_unit"},
                     "countries": {"$addToSet": "$pais"}
                 }
@@ -177,7 +176,7 @@ class Trend:
                 "$project": {
                     "_id": 0,
                     "trend": "$_id",
-                    "appearances": 1,
+                    "appearances": {"$size": "$time_units"},
                     "time_units_active": {"$size": "$time_units"},
                     "countries": 1,
                     "raw_time_units": "$time_units" 
@@ -191,7 +190,8 @@ class Trend:
         
         for r in result:
             if "raw_time_units" in r:
-                r["raw_time_units"] = [t.isoformat() + "Z" for t in r["raw_time_units"]]
+                # El isoformat ahora incluirá el sufijo -05:00, avisando al front que ya está ajustado
+                r["raw_time_units"] = [t.isoformat() for t in r["raw_time_units"]]
                 
         return result
 
