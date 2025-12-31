@@ -306,7 +306,7 @@ async function refreshData() {
         drawSpreadTable(spr.data);
 
         // Actualizar label de "Última actualización" con hora local
-        const lastUpd = await fetch('api/last_update').then(r => r.json());
+        const lastUpd = await fetch('/api/last_update').then(r => r.json());
         document.getElementById('last-update').innerText = `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
 
     } catch (e) {
@@ -382,7 +382,7 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
 async function initApp() {
     try {
         // 1. Obtener la configuración del backend
-        const configResp = await fetch('api/config');
+        const configResp = await fetch('/api/config');
         const config = await configResp.json();
         
         // 2. Guardar la URL base
