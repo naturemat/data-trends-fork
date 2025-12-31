@@ -2,7 +2,9 @@ import os
 import sys
 import logging
 from datetime import datetime
+from pathlib import Path  # Añadido para manejo de rutas
 import pandas as pd
+from dotenv import load_dotenv  # Añadido para cargar variables de entorno
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
@@ -10,6 +12,12 @@ from scrapy.utils.project import get_project_settings
 from modules.scraper import scraper
 from app.crud import save_scraped_trends  # Nueva integración con MongoDB
 
+# ============================================================
+# CARGA DE VARIABLES DE ENTORNO (.env)
+# ============================================================
+# Esto busca el archivo .env en la misma carpeta que este script (main.py)
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # ============================================================
 # CONFIG LOGGING
@@ -58,6 +66,7 @@ def save_csv(trends, output_path):
 def save_to_database(trends):
     """Guarda las tendencias en MongoDB."""
     try:
+        # Aquí save_scraped_trends usará las variables cargadas por load_dotenv()
         count = save_scraped_trends(trends)
         log.info(f"{count} tendencias guardadas en MongoDB")
         return count
