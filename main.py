@@ -13,13 +13,6 @@ from modules.scraper import scraper
 from app.crud import save_scraped_trends  # Nueva integración con MongoDB
 
 # ============================================================
-# CARGA DE VARIABLES DE ENTORNO (.env)
-# ============================================================
-# Esto busca el archivo .env en la misma carpeta que este script (main.py)
-env_path = Path(__file__).parent / '.env'
-load_dotenv(dotenv_path=env_path)
-
-# ============================================================
 # CONFIG LOGGING
 # ============================================================
 logging.basicConfig(
@@ -27,6 +20,18 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 log = logging.getLogger("Runner")
+
+# ============================================================
+# CARGA DE VARIABLES DE ENTORNO (.env)
+# ============================================================
+# Esto busca el archivo .env en la misma carpeta que este script (main.py)
+env_path = "/home/ubuntu/scraper/.env"
+
+if not load_dotenv(env_path):
+    log.error(f"No se pudo cargar el archivo .env en {env_path}")
+else:
+    log.info(f".env cargado correctamente desde {env_path}")
+load_dotenv(dotenv_path=env_path)
 
 
 # ============================================================
