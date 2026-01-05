@@ -1,5 +1,7 @@
 exports/
 
+settings.json
+*.vscode/
 __pycache__/
 *.pyc
 *.pyo
