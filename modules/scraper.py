@@ -27,15 +27,20 @@ class scraper(scrapy.Spider):
 
     def parse(self, response, country):
 
-        items = response.css("li.bg-sky-50, li.dark\\:bg-slate-950, li")
+        first_block = response.css("div.list-container").get()
+        
+        if not first_block:
+            return
 
+        block = response.css("div.list-container")[0]
+        items = block.css("li")
+        
         clean_rows = []
         seen = set()
 
         for li in items:
 
             trend = li.css("a.trend-link::text").get()
-            count_raw = li.css(".tweet-count::attr(data-count)").get()
 
             if not trend:
                 continue
@@ -47,17 +52,11 @@ class scraper(scrapy.Spider):
                 continue
             seen.add(trend.lower())
 
-            tweet_count = int(count_raw) if count_raw and count_raw.isdigit() else None
-
-            row = {
-                "trend": trend,
-                "tweet_count": tweet_count,
-                "country": country,  # viene desde start_requests
-            }
-
-            clean_rows.append(row)
-            yield row
-
-        # para modo tipo Instagram-like
-        if scraper.collected is not None:
+            row = { "trend": trend, "country": country, } 
+            
+            clean_rows.append(row) 
+            yield row 
+            
+        # para modo tipo Instagram-like 
+        if scraper.collected is not None: 
             scraper.collected.extend(clean_rows)
