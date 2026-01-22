@@ -18,6 +18,13 @@ env/
 .DS_Store
 Thumbs.db
 
+# FAISS index files
+faiss_index.idx
+faiss_metadata.pkl
+
+# Archivos de guia para la integracion con IA
+*.md
+
 #Archivo que almacena las tendencias
 tendencias.csv
 

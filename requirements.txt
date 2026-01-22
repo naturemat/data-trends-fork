@@ -30,3 +30,6 @@ python-dotenv
 scrapy
 numpy
 pandas
+sentence-transformers
+transformers
+faiss-cpu
