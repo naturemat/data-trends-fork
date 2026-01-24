@@ -103,7 +103,51 @@ python scripts/demo_api.py
 - GET `/api/metrics/persistence` – Frecuencia de aparición de temas en el tiempo.
 - GET `/api/metrics/spread` – Alcance geográfico y nivel de difusión (Local, Regional, Global).
 - POST `api/ai_summary` – Generar resumen de tendencias con IA
+- GET `/api/embeddings/enrich` – Todas las tendencias con tópicos asignados por IA (Hugging Face)
+- POST `/api/embeddings/search` – Buscar tendencias similares usando embeddings semánticos
 - GET `/config` – Obtiene la configuración pública para el frontend
+
+### Consumo de API de Embeddings en Frontend
+
+La API de embeddings permite mostrar tendencias categorizadas por tópicos usando IA (Hugging Face).
+
+#### Endpoints principales:
+
+- **GET /api/embeddings/enrich**: Devuelve todas las tendencias con sus tópicos asignados.
+  - **Respuesta**: `{"trends": [{"trend_id": "...", "trend_text": "...", "topic": "..."}, ...]}`
+  - **Uso**: Obtener datos para procesar tópicos y tendencias.
+
+- **POST /api/embeddings/search**: Busca tendencias similares a un texto dado.
+  - **Cuerpo**: `{"query": "texto de búsqueda"}`
+  - **Respuesta**: `{"results": [{"trend_id": "...", "trend_text": "...", "topic": "...", "similarity": 0.95}, ...]}`
+  - **Uso**: Búsqueda semántica de tendencias.
+
+#### Mostrar top 3 tópicos y tendencias en tarjetas:
+
+1. **Obtener datos**: Hacer fetch a `GET /api/embeddings/enrich`.
+2. **Procesar tópicos**:
+   - Agrupar tendencias por `topic`.
+   - Contar la frecuencia de cada tópico (número de tendencias por tópico).
+   - Ordenar por frecuencia descendente y seleccionar los top 3 tópicos.
+3. **Tendencias por tópico**:
+   - Para cada tópico top, filtrar las tendencias de ese tópico.
+   - Agrupar por `trend_text` para contar repeticiones (si hay duplicados).
+   - Ordenar por frecuencia y seleccionar top 5-10 tendencias que más aportan (más frecuentes).
+4. **Renderizar en frontend**: Crear tarjetas para cada tópico, mostrando el nombre del tópico y la lista de tendencias principales.
+
+**Ejemplo de código JavaScript**:
+```javascript
+// Obtener datos
+fetch('/api/embeddings/enrich')
+  .then(response => response.json())
+  .then(data => {
+    const trends = data.trends;
+    // Procesar para obtener top topics y trends
+    // ... lógica de agrupación y ordenamiento ...
+  });
+```
+
+Los tópicos se clasifican en categorías como `sports`, `news_&_social_concern`, `film_tv_&_video`, etc., usando el modelo `cardiffnlp/tweet-topic-21-multi`.
 
 ## Variables de entorno
 
