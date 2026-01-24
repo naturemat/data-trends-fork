@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, render_template
 from app.models import Trend
 from openai import OpenAI
 from dateutil import parser
+from modules.embeddings import embedding_manager
 
 # ---------------------------------------------------------------------
 # Blueprint
@@ -195,3 +196,32 @@ def ai_summary():
         return jsonify({"summary": f"Error en la IA: {str(e)}"}), 500
 
     return jsonify({"summary": summary})
+
+
+# ---------------------------------------------------------------------
+# Embeddings and Enrichment
+# ---------------------------------------------------------------------
+@routes_blueprint.post("/api/embeddings/search")
+def embeddings_search():
+    """Search for similar trends using semantic embeddings."""
+    content = request.get_json(silent=True) or {}
+    query = content.get("query", "").strip()
+
+    if not query:
+        return jsonify({"error": "Query text is required"}), 400
+
+    try:
+        results = embedding_manager.search_similar(query, top_k=10)
+        return jsonify({"results": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@routes_blueprint.get("/api/embeddings/enrich")
+def embeddings_enrich():
+    """Retrieve all trends with their enrichment data (topics)."""
+    try:
+        enriched_trends = embedding_manager.get_all_enriched_trends()
+        return jsonify({"trends": enriched_trends})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
