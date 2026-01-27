@@ -12,7 +12,7 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // 1. Instalamos las librerías pesadas (PyTorch CPU)
+                // 1. Instalamos librerías (Versión CPU Ligera)
                 sh '''
                     sudo pip3 install -r requirements.txt \
                     --index-url https://download.pytorch.org/whl/cpu \
@@ -22,7 +22,7 @@ pipeline {
                     --no-cache-dir
                 '''
                 
-                // 2. Instalamos las herramientas de test manualmente
+                // 2. Herramientas de Test
                 sh 'sudo pip3 install pytest mongomock gunicorn python-dotenv --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
@@ -32,9 +32,8 @@ pipeline {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
                 
                 // CORRECCIÓN FINAL:
-                // Usamos 'env' para pasar la variable OPENAI_API_KEY falsa.
-                // Esto engaña a la aplicación para que arranque sin pedir la llave real.
-                sh 'sudo env PYTHONPATH=. OPENAI_API_KEY=sk-proj-dummy-key-para-tests python3 -m pytest tests/ --verbose'
+                // Agregamos MONGODB_URL=$MONGODB_URL para que el test sepa dónde conectarse
+                sh 'sudo env PYTHONPATH=. OPENAI_API_KEY=sk-proj-dummy-key-para-tests MONGODB_URL=$MONGODB_URL python3 -m pytest tests/ --verbose'
             }
         }
 
