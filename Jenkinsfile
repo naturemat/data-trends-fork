@@ -13,12 +13,11 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // --- CAMBIO AQUÍ: Eliminé la línea de pyOpenSSL que daba error ---
+                // --- CAMBIO APLICADO: Eliminé pyOpenSSL y agregué --no-cache-dir ---
                 
-                // Instalamos las dependencias del proyecto
-                // Agregamos --ignore-installed por seguridad si hay conflictos futuros
-                sh 'sudo pip3 install -r requirements.txt --break-system-packages --ignore-installed'
-                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages --ignore-installed'
+                // Instalamos las dependencias del proyecto SIN usar caché (ahorra RAM)
+                sh 'sudo pip3 install -r requirements.txt --break-system-packages --ignore-installed --no-cache-dir'
+                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
 
