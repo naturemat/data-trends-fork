@@ -1,7 +1,6 @@
 pipeline {
     agent any
 
-    // 1. Cargamos la credencial correcta (MONGO_URL sin "DB")
     environment {
         MONGODB_URL = credentials('MONGO_URL')
     }
@@ -10,15 +9,16 @@ pipeline {
         stage('Preparar Entorno') {
             steps {
                 echo '--- 1. Instalando Dependencias (Test) ---'
-                // Ajustes de versiones
+                // Ajustes de versiones en requirements.txt
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // INSTALACIÓN CON LA BANDERA --break-system-packages
-                // Esto fuerza la instalación en Ubuntu moderno
-                sh 'sudo pip3 install --upgrade pyOpenSSL --break-system-packages'
-                sh 'sudo pip3 install -r requirements.txt --break-system-packages'
-                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages'
+                // --- CAMBIO AQUÍ: Eliminé la línea de pyOpenSSL que daba error ---
+                
+                // Instalamos las dependencias del proyecto
+                // Agregamos --ignore-installed por seguridad si hay conflictos futuros
+                sh 'sudo pip3 install -r requirements.txt --break-system-packages --ignore-installed'
+                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages --ignore-installed'
             }
         }
 
