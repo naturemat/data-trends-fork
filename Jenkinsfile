@@ -12,9 +12,7 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // --- TRUCO DE LA DOBLE TIENDA ---
-                // 1. --index-url: Busca PRIMERO en la tienda de CPU (para que torch sea ligero)
-                // 2. --extra-index-url: Busca DESPUES en la tienda normal (para Flask, Pandas, etc)
+                // Instalamos dependencias usando la "Doble Tienda" (CPU primero)
                 sh '''
                     sudo pip3 install -r requirements.txt \
                     --index-url https://download.pytorch.org/whl/cpu \
@@ -24,7 +22,6 @@ pipeline {
                     --no-cache-dir
                 '''
                 
-                // Instalamos el resto de herramientas de prueba
                 sh 'sudo pip3 install pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
@@ -32,7 +29,9 @@ pipeline {
         stage('QA - Tests Automáticos') {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
-                sh 'pytest tests/ --verbose'
+                // CORRECCIÓN AQUÍ: Usamos 'python3 -m pytest' en vez de solo 'pytest'
+                // Esto obliga a usar las librerías que acabamos de instalar.
+                sh 'python3 -m pytest tests/ --verbose'
             }
         }
 
