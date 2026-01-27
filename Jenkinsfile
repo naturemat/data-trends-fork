@@ -1,9 +1,8 @@
 pipeline {
     agent any
 
-    // Aquí cargamos las credenciales guardadas en Jenkins
+    // 1. Cargamos la credencial correcta (MONGO_URL sin "DB")
     environment {
-        // Esto lee el "Secret text" que guardaste como MONGODB_URL
         MONGODB_URL = credentials('MONGO_URL')
     }
 
@@ -11,14 +10,15 @@ pipeline {
         stage('Preparar Entorno') {
             steps {
                 echo '--- 1. Instalando Dependencias (Test) ---'
-                // Nota: Usamos sed para evitar conflictos de versiones si es necesario
+                // Ajustes de versiones
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // Instalamos dependencias en la máquina de Jenkins para poder testear
-                sh 'sudo pip3 install --upgrade pyOpenSSL'
-                sh 'sudo pip3 install -r requirements.txt'
-                sh 'sudo pip3 install pandas pytest mongomock gunicorn'
+                // INSTALACIÓN CON LA BANDERA --break-system-packages
+                // Esto fuerza la instalación en Ubuntu moderno
+                sh 'sudo pip3 install --upgrade pyOpenSSL --break-system-packages'
+                sh 'sudo pip3 install -r requirements.txt --break-system-packages'
+                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages'
             }
         }
 
@@ -39,7 +39,7 @@ pipeline {
 
                     echo "--- 3. Desplegando a Producción (${prodIP}) ---"
 
-                    // A. Generamos el archivo .env AQUÍ (en Jenkins) usando las credenciales
+                    // A. Generamos el archivo .env
                     sh """
                         echo "MONGODB_URL=${MONGODB_URL}" > .env
                         echo "FLASK_ENV=production" >> .env
@@ -47,8 +47,7 @@ pipeline {
                         echo "GROQCLOUD_API_KEY=***REMOVED***" >> .env
                     """
 
-                    // B. Enviamos los archivos a la OTRA máquina usando RSYNC por SSH
-                    // Nota: Excluimos cosas innecesarias para que sea rápido
+                    // B. Enviamos los archivos a la OTRA máquina
                     sh """
                         rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
                         --exclude='.git' \
@@ -71,7 +70,7 @@ pipeline {
     post {
         always {
             cleanWs()
-            echo '♻️ Workspace limpiado con exito.'
+            echo '♻️ Workspace limpiado.'
         }
         success {
             echo '🎉 ¡DESPLIEGUE EXITOSO! La Instancia A ha sido actualizada.'
