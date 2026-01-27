@@ -5,158 +5,398 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/assets/logo.png">
     <title>DataTrendX</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* Forzamos que el contenedor no pueda crecer más allá de lo definido */
-        .chart-container {
-            position: relative;
-            height: 300px !important; /* Altura fija en píxeles */
-            width: 100% !important;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
+    
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-50 text-slate-800 flex h-screen overflow-hidden">
 
-    <header class="bg-white shadow-sm border-b sticky top-0 z-10 p-4">
-        <div class="max-w-7xl mx-auto flex flex-wrap gap-4 items-end justify-between">
-            <img src="/assets/logo.png" alt="Logo" class="h-12 w-auto object-contain">
-            <div>
-                <h1 class="text-xl font-bold text-blue-600">DataTrendX</h1>
-                <p class="text-xs text-slate-500" id="last-update">Actualizando...</p>
-                <p class="text-xs text-slate-500 italic">
-                    Todos los datos y gráficas se muestran en hora ecuatoriana.
-                </p>
-            </div>
-
-            <div class="flex flex-wrap gap-3 text-sm">
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">País</label>
-                    <select id="filter-pais" class="border rounded px-2 py-1 bg-white">
-                        <option value="worldwide">Global (Worldwide)</option>
-                        <option value="argentina">Argentina</option>
-                        <option value="australia">Australia</option>
-                        <option value="brazil">Brazil</option>
-                        <option value="canada">Canada</option>
-                        <option value="colombia">Colombia</option>
-                        <option value="ecuador">Ecuador</option>
-                        <option value="france">France</option>
-                        <option value="germany">Germany</option>
-                        <option value="india">India</option>
-                        <option value="japan">Japan</option>
-                        <option value="mexico">Mexico</option>
-                        <option value="netherlands">Netherlands</option>
-                        <option value="peru">Peru</option>
-                        <option value="russia">Russia</option>
-                        <option value="spain">Spain</option>
-                        <option value="sweden">Sweden</option>
-                        <option value="switzerland">Switzerland</option>
-                        <option value="united-kingdom">United Kingdom</option>
-                        <option value="united-states">United States</option>
-                    </select>
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Desde</label>
-                    <input type="date" id="filter-date-from" class="border rounded px-2 py-1">
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Hasta</label>
-                    <input type="date" id="filter-date-to" class="border rounded px-2 py-1">
-                </div>
-
-                <button id="btn-update" class="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 self-end transition">
-                    Actualizar
-                </button>
-            </div>
+    <aside class="sidebar w-64 bg-white border-r border-slate-200 flex flex-col z-20">
+        <div class="p-6 flex items-center gap-3">
+            <img src="/assets/logo.png" alt="Logo" class="h-10 w-auto">
+            <span class="text-xl font-black tracking-tight text-blue-600">DataTrendX</span>
         </div>
-    </header>
 
-    <main class="max-w-7xl mx-auto p-4 space-y-6">
+        <nav class="flex-1 px-4 space-y-2">
+            <a href="#" class="nav-link active" onclick="showSection('dashboard', this)">
+                <span class="icon">📊</span> Dashboards
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('alcance', this)">
+                <span class="icon">🌎</span> Alcance de Tendencias
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('ia', this)">
+                <span class="icon">✨</span> Análisis IA
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('acerca', this)">
+                <span class="icon">ℹ️</span> Acerca de
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('ayuda', this)">
+                <span class="icon">❓</span> Ayuda
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex-1 flex flex-col overflow-y-auto">
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-4 rounded-xl shadow-sm border">
-                <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Actividad Temporal</h2>
-                <div class="mt-2 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                    <p class="text-xs text-slate-600 leading-relaxed">
-                        Mide el <strong>volumen total de temas únicos</strong> detectados en cada intervalo de tiempo. Los picos en la gráfica indican momentos de alta rotación de información o eventos de gran relevancia donde surgen muchos hashtags nuevos simultáneamente.
-                    </p>
+        <header class="bg-blue-600 p-4 shadow-lg sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-white">
+                <div class="flex flex-col">
+                    <span class="text-[10px] font-black opacity-70 uppercase tracking-widest">Estado del Sistema</span>
+                    <p id="last-update" class="text-sm font-bold italic">Cargando...</p>
+                    <p class="text-[10px] opacity-80 font-medium">🕒 Zona Horaria: Ecuador (GMT-5)</p>
                 </div>
-                <div class="h-64 relative"> <canvas id="chart-activity"></canvas>
-                </div>
-            </div>
-            
-            <div class="bg-white p-4 rounded-xl shadow-sm border">
-                <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Intensidad de Tweets</h2>
-                <div class="mt-2 p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-400">
-                    <p class="text-xs text-slate-600 leading-relaxed">
-                        Compara la fuerza de cada tema según su volumen de publicaciones. La brecha entre el <strong>Máximo</strong> y el <strong>Promedio</strong> permite diferenciar temas con picos virales momentáneos de aquellos que mantienen una conversación constante y estable.
-                    </p>
-                </div>
-                <div class="h-64 relative"> <canvas id="chart-intensity"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border">
-            <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Persistencia (Temas más duraderos)</h2>
-            <div class="mt-2 p-3 bg-indigo-50 rounded-lg border-l-4 border-indigo-400">
-            <p class="text-xs text-slate-600 leading-relaxed">
-                    Indica el <strong>nivel de retención</strong> de un tema. Una alta frecuencia (apariciones) sugiere que la tendencia ha logrado mantenerse en el ranking a pesar de la actualización constante de datos, reflejando temas de interés prolongado o debates activos.
-                </p>
-            </div>
-            <div class="h-80 relative"> <canvas id="chart-persistence"></canvas>
-            </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border overflow-hidden">
-            <div class="bg-white p-6 rounded-xl shadow-sm border mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="font-bold text-slate-800 text-lg">Resumen Inteligente</h2>
-                        <p class="text-sm text-slate-500">Genera un análisis narrativo basado en los filtros actuales.</p>
+                
+                <div class="flex items-center gap-3 bg-white/10 p-2 rounded-2xl backdrop-blur-lg border border-white/20">
+                    <div class="flex flex-col px-2">
+                        <label class="text-[9px] font-black uppercase opacity-70">País</label>
+                        <select id="filter-pais" class="bg-transparent text-sm font-bold focus:outline-none border-none cursor-pointer">
+                            <option value="worldwide">Global (Worldwide)</option>
+                            <option value="argentina">Argentina</option>
+                            <option value="australia">Australia</option>
+                            <option value="brazil">Brazil</option>
+                            <option value="canada">Canada</option>
+                            <option value="colombia">Colombia</option>
+                            <option value="ecuador">Ecuador</option>
+                            <option value="france">France</option>
+                            <option value="germany">Germany</option>
+                            <option value="india">India</option>
+                            <option value="japan">Japan</option>
+                            <option value="mexico">Mexico</option>
+                            <option value="netherlands">Netherlands</option>
+                            <option value="peru">Peru</option>
+                            <option value="russia">Russia</option>
+                            <option value="spain">Spain</option>
+                            <option value="sweden">Sweden</option>
+                            <option value="switzerland">Switzerland</option>
+                            <option value="united-kingdom">United Kingdom</option>
+                            <option value="united-states">United States</option>
+                        </select>
                     </div>
-                    <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2">
-                        <span>✨</span> Generar Análisis
+                    <span class="opacity-30 text-xl">|</span>
+                    <div class="flex flex-col px-2">
+                        <label class="text-[9px] font-black uppercase opacity-70">Desde</label>
+                        <input type="date" id="filter-date-from" class="bg-transparent text-sm font-bold focus:outline-none">
+                    </div>
+                    <div class="flex flex-col px-2">
+                        <label class="text-[9px] font-black uppercase opacity-70">Hasta</label>
+                        <input type="date" id="filter-date-to" class="bg-transparent text-sm font-bold focus:outline-none">
+                    </div>
+                    
+                    <button id="btn-update" class="bg-white text-blue-600 px-6 py-2 rounded-xl text-xs font-black uppercase hover:bg-blue-50 transition-all shadow-md active:scale-95">
+                        Actualizar
                     </button>
                 </div>
-                <div id="ai-response-container" class="hidden">
-                    <div class="p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-lg">
-                        <p id="ai-text" class="text-sm text-slate-700 italic leading-relaxed"></p>
+            </div>
+        </header>
+
+        <main class="p-8 max-w-7xl mx-auto w-full space-y-10">
+
+            <section id="sec-dashboard" class="content-section space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="stat-card card-green">
+                        <div class="card-icon">📈</div>
+                        <div class="card-content">
+                            <h3 id="stat-total">0</h3>
+                            <p>Tendencias totales</p>
+                        </div>
+                        <div class="card-glow"></div>
+                    </div>
+
+                    <div class="stat-card card-blue">
+                        <div class="card-icon">🌍</div>
+                        <div class="card-content">
+                            <h3 id="stat-paises">20</h3>
+                            <p>Países Analizados</p>
+                        </div>
+                        <div class="card-glow"></div>
+                    </div>
+
+                    <div class="stat-card card-purple">
+                        <div class="card-icon">✨</div>
+                        <div class="card-content">
+                            <h3 id="stat-globales">0</h3>
+                            <p>Tendencias Globales 
+                            <span id="stat-globales-pct" class="text-xs opacity-75 ml-1">(--%)</span>
+                            </p>
+                        </div>
+                        <div class="card-glow"></div>
                     </div>
                 </div>
-            </div>
-            <h2 class="font-bold mb-4 text-slate-600 text-sm uppercase tracking-wider">Alcance Global (Spread)</h2>
-            <div class="mt-2 p-3 bg-slate-50 rounded-lg border-l-4 border-blue-500">
-                <p class="text-xs text-slate-600 leading-relaxed">
-                    Esta métrica analiza la <strong>expansión territorial</strong> de los temas. Una tendencia se clasifica como 
-                    <span class="text-purple-700 font-bold">Global</span> si logra entrar en el ranking mundial (Worldwide), 
-                    <span class="text-blue-700 font-bold">Regional</span> si cruza fronteras y aparece en varios países simultáneamente, y 
-                    <span class="text-slate-700 font-bold">Local</span> si su impacto está contenido en una sola nación. 
-                    Es útil para medir si una conversación es un fenómeno cultural masivo o un interés específico de una comunidad.
-                </p>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-50 border-b">
-                        <tr>
-                            <th class="p-4">Tendencia</th>
-                            <th class="p-4">Alcance</th>
-                            <th class="p-4">¿En Worldwide?</th>
-                            <th class="p-4">Lista de Países</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-spread-body" class="divide-y divide-slate-100">
-                        </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
 
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="chart-box bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="chart-title text-blue-600">Actividad Temporal</h4>
+                        <div class="mt-3 mb-6 flex bg-blue-50 rounded-2xl overflow-hidden border border-blue-100">
+                            <div class="w-2.5 bg-blue-500"></div> <div class="p-4">
+                                <p class="text-[13px] text-slate-700 leading-relaxed">
+                                    Mide el <strong class="text-blue-700">volumen total de temas únicos</strong> detectados. Los picos indican momentos de alta rotación de información o eventos de gran relevancia.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="chart-container"><canvas id="chart-activity"></canvas></div>
+                    </div>
+
+                    <div class="chart-box bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <h4 class="chart-title text-violet-600">Análisis de Supervivencia</h4>
+                        <div class="mt-3 mb-6 flex bg-violet-50 rounded-2xl overflow-hidden border border-violet-100">
+                            <div class="w-2.5 bg-violet-600"></div> 
+                            <div class="p-4">
+                                <p class="text-[13px] text-slate-700 leading-relaxed font-medium">
+                                    Clasifica las tendencias según su <strong class="text-violet-700">tiempo de permanencia</strong>. Permite distinguir entre ráfagas momentáneas y temas con tracción real que dominan la conversación.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="chart-container"><canvas id="chart-impact"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="chart-box bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h4 class="chart-title text-center text-[#6366f1]">Persistencia (Temas más duraderos)</h4>
+                    <div class="mt-4 mb-6 flex bg-[#6366f1]/10 rounded-2xl overflow-hidden border border-[#6366f1]/20 max-w-4xl mx-auto">
+                        <div class="w-2.5 bg-[#6366f1]"></div> <div class="p-4">
+                            <p class="text-[13px] text-slate-700 leading-relaxed">
+                                Indica el <strong class="text-[#6366f1]">nivel de retención</strong> de un tema. Refleja qué tendencias han logrado mantenerse en el ranking a pesar de la actualización constante de datos, destacando los debates más activos.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 400px !important;"><canvas id="chart-persistence"></canvas></div>
+                </div>
+            </section>
+
+            <section id="sec-alcance" class="content-section hidden space-y-6">
+                <div class="chart-box">
+                    <h2 class="text-2xl font-black text-slate-800 mb-2">Alcance Global (Spread)</h2>
+                    
+                    <div class="flex bg-slate-50 rounded-3xl overflow-hidden border border-slate-200 mb-8">
+                        <div class="w-3 bg-slate-700"></div>
+                        <div class="p-6">
+                            <p class="text-sm text-slate-700 leading-relaxed font-medium">
+                                Esta métrica analiza la expansión territorial de los temas. Una tendencia se clasifica como 
+                                <span class="px-3 py-1 rounded-full text-[11px] font-black bg-purple-600 text-white mx-1">GLOBAL</span> si entra en el ranking mundial, 
+                                <span class="px-3 py-1 rounded-full text-[11px] font-black bg-sky-400 text-white mx-1">REGIONAL</span> si aparece en varios países, 
+                                y <span class="px-3 py-1 rounded-full text-[11px] font-black bg-emerald-500 text-white mx-1">LOCAL</span> si está contenida en una sola nación.
+                            </p>
+                        </div>
+                    </div>
+                                
+                    <div class="overflow-x-auto rounded-xl border border-slate-100">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Tendencia</th>
+                                    <th>Alcance</th>
+                                    <th>¿En Worldwide?</th>
+                                    <th>Lista de Países</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-spread-body">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="sec-ia" class="content-section hidden">
+                <div class="chart-box space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Resumen Inteligente</h2>
+                            <p class="text-sm text-slate-500">Análisis narrativo generado por IA</p>
+                        </div>
+                        <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200">
+                            ✨ Generar Análisis
+                        </button>
+                    </div>
+                    <div id="ai-response-container" class="hidden p-6 bg-indigo-50 border-l-8 border-indigo-500 rounded-xl">
+                        <p id="ai-text" class="text-slate-700 italic leading-relaxed font-medium"></p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="sec-acerca" class="content-section hidden space-y-8">
+                <div class="chart-box">
+                    <div class="flex flex-col md:flex-row items-center gap-6 mb-8">
+                        <div class="flex-shrink-0 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+                            <img src="/assets/logo.png" alt="DataTrendX Logo" class="h-16 w-auto object-contain">
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <h2 class="text-3xl font-black text-slate-800 tracking-tight">Presentamos DataTrendX</h2>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <p class="text-slate-600 leading-relaxed font-medium">
+                                <span class="text-blue-600 font-bold">Observación Inteligente:</span> Nuestra herramienta monitorea el mundo digital y simplifica la información compleja.
+                            </p>
+                            <p class="text-slate-600 leading-relaxed font-medium">
+                                <span class="text-blue-600 font-bold">Filtro de Ruido:</span> En lugar de abrumarte, el sistema detecta automáticamente los temas cruciales y elimina lo irrelevante.
+                            </p>
+                        </div>
+                        <div class="space-y-4">
+                            <p class="text-slate-600 leading-relaxed font-medium">
+                                <span class="text-blue-600 font-bold">Contexto con IA:</span> No solo te dice qué es popular, sino por qué. Transformamos datos en narrativas fáciles de leer en segundos.
+                            </p>
+                            <p class="text-slate-600 leading-relaxed font-medium">
+                                <span class="text-blue-600 font-bold">Acceso Libre:</span> Durante esta fase de investigación, puedes empezar a descubrir patrones hoy mismo.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="relative overflow-hidden rounded-2xl bg-white shadow-md border border-slate-100 flex flex-col">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
+                        <div class="p-4 flex-1 flex items-center justify-center">
+                            <img src="/assets/actividad.jpg" alt="Actividad Temporal" class="rounded-xl w-full h-auto object-contain shadow-sm">
+                        </div>
+                    </div>
+
+                    <div class="relative overflow-hidden rounded-2xl bg-white shadow-md border border-slate-100 flex flex-col">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-violet-600"></div>
+                        <div class="p-4 flex-1 flex items-center justify-center">
+                            <img src="/assets/supervivencia.jpg" alt="Supervivencia" class="rounded-xl w-full h-auto object-contain shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div class="chart-box">
+                            <h4 class="text-lg font-bold text-blue-600 mb-3 border-b border-blue-100 pb-2">Análisis de Intensidad</h4>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <span class="text-blue-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Resolución Temporal:</strong> Monitoreo de alta frecuencia capaz de detectar cambios en la agenda digital hora a hora.</p>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="text-blue-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Persistencia Real:</strong> Distingue entre noticias pasajeras y temas de conversación constante que duran toda la semana.</p>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="chart-box">
+                            <h4 class="text-lg font-bold text-blue-600 mb-3 border-b border-blue-100 pb-2">Resumen Automático</h4>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <span class="text-blue-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Foco Temático:</strong> Identifica rápidamente si la conversación gira en torno a economía, deportes o política.</p>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="text-blue-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Sentimiento Público:</strong> Nuestra IA analiza los titulares para concluir si la percepción general es positiva o negativa.</p>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="chart-box">
+                            <h4 class="text-lg font-bold text-purple-600 mb-3 border-b border-purple-100 pb-2">Nuestra Metodología</h4>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Recolección Ética:</strong> Lectura automática de tendencias públicas respetando las normas de la comunidad.</p>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Curación de Datos:</strong> Filtrado estricto de duplicados para almacenar y procesar solo información valiosa.</p>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Alcance Matemático:</strong> Cálculo preciso para clasificar si una tendencia es Local, Regional o Global.</p>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="chart-box">
+                            <h4 class="text-lg font-bold text-purple-600 mb-3 border-b border-purple-100 pb-2">Lo que debes saber</h4>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Tiempos de Actualización:</strong> La información se renueva en intervalos programados, lo que puede implicar un leve retraso respecto al "en vivo".</p>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="text-purple-500 mr-2">•</span>
+                                    <p class="text-slate-600 text-sm"><strong class="text-slate-800">Privacidad:</strong> Analizamos exclusivamente datos públicos, respetando la privacidad de las cuentas cerradas.</p>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-box bg-slate-50">
+                    <h4 class="text-lg font-bold text-slate-800 mb-4 uppercase tracking-wider">Mejora Continua</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            <strong class="text-slate-800">Arquitectura Modular:</strong> Hemos construido el sistema pieza por pieza para permitir un crecimiento ágil y ordenado.
+                        </p>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            <strong class="text-slate-800">Expansión Futura:</strong> Nuestro enfoque actual es la precisión, con planes para agregar nuevas regiones y fuentes próximamente.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="sec-ayuda" class="content-section hidden">
+                <div class="chart-box">
+                    <h2 class="text-2xl font-black text-slate-800 mb-10 uppercase text-center tracking-wide">Preguntas Frecuentes</h2>
+                    
+                    <div class="space-y-10 max-w-3xl mx-auto">
+                        <div class="relative pl-6 border-l-4 border-blue-500/30 hover:border-blue-500 transition-colors">
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                ¿De dónde obtiene DataTrendX la información?
+                            </h3>
+                            <p class="text-slate-600 leading-relaxed">
+                                Nuestro sistema monitorea automáticamente las conversaciones públicas en la plataforma X (trends24) para identificar qué temas son tendencia. Antes de mostrártelos, la información pasa por un proceso de limpieza para asegurar que solo veas datos relevantes y verificados.
+                            </p>
+                        </div>
+
+                        <div class="relative pl-6 border-l-4 border-purple-500/30 hover:border-purple-500 transition-colors">
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                ¿Cómo sé si una tendencia es mundial o solo de mi país?
+                            </h3>
+                            <p class="text-slate-600 leading-relaxed">
+                                DataTrendX calcula automáticamente el Nivel de Difusión de cada tema. El sistema analiza si un hashtag aparece en múltiples ubicaciones simultáneamente para clasificarlo como Local, Regional o Global.
+                            </p>
+                        </div>
+
+                        <div class="relative pl-6 border-l-4 border-indigo-500/30 hover:border-indigo-500 transition-colors">
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                ¿Puedo consultar tendencias de fechas pasadas?
+                            </h3>
+                            <p class="text-slate-600 leading-relaxed">
+                                Sí. A diferencia de las redes sociales que se centran en el ahora, DataTrendX almacena un historial permanente de la actividad. Puedes utilizar los filtros de fecha en el panel superior para analizar cómo evolucionó una tendencia específica.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        function showSection(sectionId, element) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+            // Quitar clase activa de los links
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            
+            // Mostrar la sección correspondiente
+            const target = document.getElementById('sec-' + sectionId);
+            if(target) target.classList.remove('hidden');
+            
+            // Marcar link como activo
+            if(element) element.classList.add('active');
+        }
+    </script>
+    
     <script src="/js/app.js"></script>
 </body>
 </html>
