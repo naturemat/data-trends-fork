@@ -3,8 +3,8 @@ pipeline {
 
     // Aquí cargamos las credenciales guardadas en Jenkins
     environment {
-        // Esto lee el "Secret text" que guardaste como MONGODB_URL
-        MONGODB_URL = credentials('MONGODB_URL')
+        // Esto lee el "Secret text" que guardaste como MONGO_URL
+        MONGODB_URL = credentials('MONGO_URL')
     }
 
     stages {
@@ -71,7 +71,7 @@ pipeline {
     post {
         always {
             cleanWs()
-            echo '♻️ Workspace limpiado.'
+            echo '♻️ Workspace limpiado con exito.'
         }
         success {
             echo '🎉 ¡DESPLIEGUE EXITOSO! La Instancia A ha sido actualizada.'
