@@ -29,8 +29,8 @@ pipeline {
         stage('QA - Tests Automáticos') {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
-                // CORRECCIÓN FINAL: Agregamos 'sudo' al principio
-                sh 'sudo python3 -m pytest tests/ --verbose'
+                // CORRECCIÓN AQUÍ: Agregamos 'PYTHONPATH=.' para que encuentre app.py
+                sh 'sudo PYTHONPATH=. python3 -m pytest tests/ --verbose'
             }
         }
 
