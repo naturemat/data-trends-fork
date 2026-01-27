@@ -12,7 +12,7 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // Instalamos dependencias usando la "Doble Tienda" (CPU primero)
+                // Instalamos dependencias pesadas con el truco de la CPU
                 sh '''
                     sudo pip3 install -r requirements.txt \
                     --index-url https://download.pytorch.org/whl/cpu \
@@ -22,14 +22,15 @@ pipeline {
                     --no-cache-dir
                 '''
                 
-                sh 'sudo pip3 install pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
+                // CORRECCIÓN AQUÍ: Agregamos 'python-dotenv' explícitamente para asegurar que pytest lo encuentre
+                sh 'sudo pip3 install pytest mongomock gunicorn python-dotenv --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
 
         stage('QA - Tests Automáticos') {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
-                // CORRECCIÓN AQUÍ: Agregamos 'PYTHONPATH=.' para que encuentre app.py
+                // Mantenemos el sudo y el PYTHONPATH que ya funcionaron
                 sh 'sudo PYTHONPATH=. python3 -m pytest tests/ --verbose'
             }
         }
