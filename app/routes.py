@@ -120,18 +120,6 @@ def persistence_metric():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@routes_blueprint.get("/api/metrics/intensity")
-def intensity_metric():
-    try:
-        params = parse_time_range(request)
-        data = Trend.aggregate_intensity(
-            dt_from=params["from"], dt_to=params["to"],
-            pais=params["pais"], limit=20
-        )
-        return jsonify({"data": data})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
 @routes_blueprint.get("/api/metrics/spread")
 def spread_metric():
     try:
@@ -224,4 +212,38 @@ def embeddings_enrich():
         enriched_trends = embedding_manager.get_all_enriched_trends()
         return jsonify({"trends": enriched_trends})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@routes_blueprint.get('/api/metrics/summary')
+def get_summary():
+    try:
+        params = parse_time_range(request)
+        granularity = request.args.get('granularity', 'hour')
+
+        summary = Trend.get_dashboard_summary(
+            pais=params["pais"], 
+            dt_from=params["from"], 
+            dt_to=params["to"], 
+            granularity=granularity
+        )
+        return jsonify(summary)
+    except Exception as e:
+        print(f"Error en /api/metrics/summary: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+@routes_blueprint.get("/api/metrics/survival")
+def metrics_survival():
+    try:
+        params = parse_time_range(request)
+        granularity = request.args.get("granularity", "hour")
+        
+        data = Trend.aggregate_survival_stats(
+            pais=params["pais"],
+            dt_from=params["from"],
+            dt_to=params["to"],
+            granularity=granularity
+        )
+        return jsonify({"data": data})
+    except Exception as e:
+        print(f"Error en survival: {e}")
         return jsonify({"error": str(e)}), 500
