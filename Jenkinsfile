@@ -12,7 +12,7 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // Instalamos dependencias pesadas con el truco de la CPU
+                // 1. Instalamos las librerías pesadas (PyTorch CPU)
                 sh '''
                     sudo pip3 install -r requirements.txt \
                     --index-url https://download.pytorch.org/whl/cpu \
@@ -22,7 +22,7 @@ pipeline {
                     --no-cache-dir
                 '''
                 
-                // CORRECCIÓN AQUÍ: Agregamos 'python-dotenv' explícitamente para asegurar que pytest lo encuentre
+                // 2. Instalamos las herramientas de test manualmente
                 sh 'sudo pip3 install pytest mongomock gunicorn python-dotenv --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
@@ -30,8 +30,11 @@ pipeline {
         stage('QA - Tests Automáticos') {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
-                // Mantenemos el sudo y el PYTHONPATH que ya funcionaron
-                sh 'sudo PYTHONPATH=. python3 -m pytest tests/ --verbose'
+                
+                // CORRECCIÓN FINAL:
+                // Usamos 'env' para pasar la variable OPENAI_API_KEY falsa.
+                // Esto engaña a la aplicación para que arranque sin pedir la llave real.
+                sh 'sudo env PYTHONPATH=. OPENAI_API_KEY=sk-proj-dummy-key-para-tests python3 -m pytest tests/ --verbose'
             }
         }
 
