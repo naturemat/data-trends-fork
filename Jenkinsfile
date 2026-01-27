@@ -71,7 +71,7 @@ pipeline {
     post {
         always {
             cleanWs()
-            echo '♻️ Workspace limpiado.'
+            echo '♻️ Workspace limpiado con exito.'
         }
         success {
             echo '🎉 ¡DESPLIEGUE EXITOSO! La Instancia A ha sido actualizada.'
