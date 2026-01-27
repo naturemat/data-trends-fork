@@ -9,13 +9,14 @@ pipeline {
         stage('Preparar Entorno') {
             steps {
                 echo '--- 1. Instalando Dependencias (Test) ---'
-                // Ajustes de versiones en requirements.txt
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // --- CAMBIO APLICADO: Eliminé pyOpenSSL y agregué --no-cache-dir ---
+                // --- TRUCO MAESTRO: Instalar PyTorch CPU primero ---
+                // Esto descarga la version ligera (200MB) en lugar de la pesada (4GB)
+                sh 'sudo pip3 install torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages --ignore-installed --no-cache-dir'
                 
-                // Instalamos las dependencias del proyecto SIN usar caché (ahorra RAM)
+                // Ahora instalamos el resto. Como torch ya esta instalado, se saltara la version gigante.
                 sh 'sudo pip3 install -r requirements.txt --break-system-packages --ignore-installed --no-cache-dir'
                 sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
             }
@@ -31,14 +32,12 @@ pipeline {
         stage('🚀 Despliegue Remoto (CD)') {
             steps {
                 script {
-                    // DATOS DE CONEXIÓN A LA INSTANCIA A (PRODUCCIÓN)
                     def prodIP = "172.31.39.188"
                     def remoteUser = "ubuntu"
                     def targetDir = "/var/www/scraper/"
 
                     echo "--- 3. Desplegando a Producción (${prodIP}) ---"
 
-                    // A. Generamos el archivo .env
                     sh """
                         echo "MONGODB_URL=${MONGODB_URL}" > .env
                         echo "FLASK_ENV=production" >> .env
@@ -46,7 +45,6 @@ pipeline {
                         echo "GROQCLOUD_API_KEY=***REMOVED***" >> .env
                     """
 
-                    // B. Enviamos los archivos a la OTRA máquina
                     sh """
                         rsync -avz -e "ssh -o StrictHostKeyChecking=no" \
                         --exclude='.git' \
@@ -56,7 +54,6 @@ pipeline {
                         ./ ${remoteUser}@${prodIP}:${targetDir}
                     """
 
-                    // C. Reiniciamos el servicio en la OTRA máquina
                     sh """
                         ssh -o StrictHostKeyChecking=no ${remoteUser}@${prodIP} \
                         'sudo systemctl restart scraper'
