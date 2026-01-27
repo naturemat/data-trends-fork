@@ -3,7 +3,7 @@ pipeline {
 
     // Aquí cargamos las credenciales guardadas en Jenkins
     environment {
-        // Esto lee el "Secret text" que guardaste como MONGO_URL
+        // Esto lee el "Secret text" que guardaste como MONGODB_URL
         MONGODB_URL = credentials('MONGO_URL')
     }
 
