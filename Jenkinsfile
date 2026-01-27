@@ -29,9 +29,8 @@ pipeline {
         stage('QA - Tests Automáticos') {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
-                // CORRECCIÓN AQUÍ: Usamos 'python3 -m pytest' en vez de solo 'pytest'
-                // Esto obliga a usar las librerías que acabamos de instalar.
-                sh 'python3 -m pytest tests/ --verbose'
+                // CORRECCIÓN FINAL: Agregamos 'sudo' al principio
+                sh 'sudo python3 -m pytest tests/ --verbose'
             }
         }
 
