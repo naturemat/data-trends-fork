@@ -12,13 +12,20 @@ pipeline {
                 sh "sed -i 's/Flask-CORS==3.1.1/Flask-CORS/' requirements.txt"
                 sh "sed -i 's/openai==0.4.6/openai/' requirements.txt"
                 
-                // --- TRUCO MAESTRO: Instalar PyTorch CPU primero ---
-                // Esto descarga la version ligera (200MB) en lugar de la pesada (4GB)
-                sh 'sudo pip3 install torch --index-url https://download.pytorch.org/whl/cpu --break-system-packages --ignore-installed --no-cache-dir'
+                // --- TRUCO DE LA DOBLE TIENDA ---
+                // 1. --index-url: Busca PRIMERO en la tienda de CPU (para que torch sea ligero)
+                // 2. --extra-index-url: Busca DESPUES en la tienda normal (para Flask, Pandas, etc)
+                sh '''
+                    sudo pip3 install -r requirements.txt \
+                    --index-url https://download.pytorch.org/whl/cpu \
+                    --extra-index-url https://pypi.org/simple \
+                    --break-system-packages \
+                    --ignore-installed \
+                    --no-cache-dir
+                '''
                 
-                // Ahora instalamos el resto. Como torch ya esta instalado, se saltara la version gigante.
-                sh 'sudo pip3 install -r requirements.txt --break-system-packages --ignore-installed --no-cache-dir'
-                sh 'sudo pip3 install pandas pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
+                // Instalamos el resto de herramientas de prueba
+                sh 'sudo pip3 install pytest mongomock gunicorn --break-system-packages --ignore-installed --no-cache-dir'
             }
         }
 
