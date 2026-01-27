@@ -31,7 +31,6 @@ pipeline {
             steps {
                 echo '--- 2. Ejecutando Pruebas de Calidad (Pytest) ---'
                 
-                // CORRECCIÓN FINAL:
                 // Agregamos MONGODB_URL=$MONGODB_URL para que el test sepa dónde conectarse
                 sh 'sudo env PYTHONPATH=. OPENAI_API_KEY=sk-proj-dummy-key-para-tests MONGODB_URL=$MONGODB_URL python3 -m pytest tests/ --verbose'
             }
@@ -40,7 +39,8 @@ pipeline {
         stage('🚀 Despliegue Remoto (CD)') {
             steps {
                 script {
-                    def prodIP = "172.31.39.188"
+                    // ASEGÚRATE QUE ESTA SEA LA IP PRIVADA DE LA INSTANCIA A
+                    def prodIP = "172.31.39.188" 
                     def remoteUser = "ubuntu"
                     def targetDir = "/var/www/scraper/"
 
@@ -62,9 +62,18 @@ pipeline {
                         ./ ${remoteUser}@${prodIP}:${targetDir}
                     """
 
+                    // --- CAMBIO IMPORTANTE AQUI ---
+                    // Instalamos dependencias LIGERAS antes de reiniciar para evitar error de espacio y módulos faltantes
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${remoteUser}@${prodIP} \
-                        'sudo systemctl restart scraper'
+                        ssh -o StrictHostKeyChecking=no ${remoteUser}@${prodIP} '
+                            cd ${targetDir} && \
+                            source venv/bin/activate && \
+                            echo "Instalando PyTorch CPU para ahorrar espacio..." && \
+                            pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+                            echo "Actualizando resto de librerias..." && \
+                            pip3 install -r requirements.txt && \
+                            sudo systemctl restart scraper
+                        '
                     """
                 }
             }
