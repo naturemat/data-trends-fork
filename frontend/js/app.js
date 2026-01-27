@@ -78,7 +78,9 @@ function formatToLocalTime(isoString, showTime = true) {
 
 function getLocalTodayString() {
     const now = new Date();
-    return now.toISOString().split('T')[0];
+    const offset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now - offset)).toISOString().split('T')[0];
+    return localISOTime;
 }
 
 function getUTCRange() {
@@ -126,29 +128,55 @@ function drawActivity(data, granularity) {
     if (chartInstances.activity) chartInstances.activity.destroy();
 
     const showTime = (granularity === 'hour');
+    
+    // CAMBIO: Ahora usamos 'new_trends' para el máximo y los datos
+    const maxValue = Math.max(...data.map(d => d.new_trends), 0);
+    // Ajuste dinámico del eje Y: si hay pocas nuevas, el techo es 10, si hay muchas, sube de 10 en 10
+    const yMax = maxValue > 10 ? Math.ceil((maxValue + 1) / 10) * 10 : 10;
 
     chartInstances.activity = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(d => formatToLocalTime(d.timestamp, showTime)),
             datasets: [{
-                label: 'Tendencias Únicas Detectadas',
-                data: data.map(d => d.total_trends),
+                label: 'Nuevas Tendencias',
+                data: data.map(d => d.new_trends), // CAMBIO AQUÍ
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37, 99, 235, 0.1)',
                 fill: true,
-                tension: 0.3,
-                pointRadius: 3,
-                pointHoverRadius: 5
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointHoverRadius: 6
             }]
         },
         options: {
-            ...chartOptions,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: yMax, 
+                    ticks: {
+                        stepSize: 10,
+                        precision: 0
+                    },
+                    grid: { color: '#f1f5f9' }
+                },
+                x: {
+                    ticks: { font: { size: 10 }, maxRotation: 45 },
+                    grid: { display: false }
+                }
+            },
             plugins: {
-                ...chartOptions.plugins,
+                legend: { display: false },
                 tooltip: {
+                    backgroundColor: '#1e293b',
+                    padding: 12,
                     callbacks: {
-                        title: (items) => `Fecha/Hora: ${items[0].label}`
+                        title: (items) => `📅 ${items[0].label}`,
+                        label: (item) => ` Temas nuevos: ${item.raw}` // CAMBIO AQUÍ
                     }
                 }
             }
@@ -156,33 +184,48 @@ function drawActivity(data, granularity) {
     });
 }
 
-function drawIntensity(data) {
-    const ctx = document.getElementById('chart-intensity').getContext('2d');
-    if (chartInstances.intensity) chartInstances.intensity.destroy();
+function drawSurvival(data) {
+    const canvas = document.getElementById('chart-impact');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (chartInstances.survival) chartInstances.survival.destroy();
 
-    chartInstances.intensity = new Chart(ctx, {
-        type: 'line',
+    chartInstances.survival = new Chart(ctx, {
+        type: 'bar',
         data: {
-            labels: data.map(d => d.trend),
-            datasets: [
-                {
-                    label: 'Máximo Tweets',
-                    data: data.map(d => d.max_tweets),
-                    borderColor: '#94a3b8',
-                    borderDash: [5, 5],
-                    fill: false
-                },
-                {
-                    label: 'Promedio Tweets',
-                    data: data.map(d => d.avg_tweets),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: true,
-                    tension: 0.2
-                }
-            ]
+            labels: data.map(d => d.label),
+            datasets: [{
+                data: data.map(d => d.count),
+                backgroundColor: [
+                    '#ef4444', // Rojo (Fugaz)
+                    '#f59e0b', // Naranja (Activa)
+                    '#3b82f6', // Azul (Persistente)
+                    '#10b981'  // Verde (Inmortal)
+                ],
+                borderRadius: 6,
+                barThickness: 40
+            }]
         },
-        options: chartOptions
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    padding: 12
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { precision: 0 },
+                    grid: { color: '#f1f5f9' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
     });
 }
 
@@ -245,28 +288,32 @@ function drawPersistence(data) {
 
 function drawSpreadTable(data) {
     const container = document.getElementById('table-spread-body');
+    if (!container) return; 
     container.innerHTML = '';
 
     data.forEach(item => {
-        // Traducimos cada país de la lista
         const translatedCountries = item.countries.map(c => countryTranslations[c] || c);
         
+        const scopeKey = item.scope.toLowerCase(); 
+        const badgeClass = `badge-${scopeKey}`;
+
         const row = document.createElement('tr');
-        row.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
         row.innerHTML = `
             <td class="p-4 font-semibold text-blue-600">${item.trend}</td>
             <td class="p-4">
-                <span class="px-2 py-1 rounded text-xs font-bold uppercase ${
-                    item.scope === 'global' ? 'bg-purple-100 text-purple-700' : 
-                    item.scope === 'regional' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                }">${item.scope === 'global' ? 'Global' : item.scope === 'regional' ? 'Regional' : 'Local'}</span>
+                <span class="badge ${badgeClass}">
+                    ${item.scope === 'global' ? 'Global' : item.scope === 'regional' ? 'Regional' : 'Local'}
+                </span>
             </td>
-            <td class="p-4">${item.in_worldwide ? '🌎 <span class="text-green-600">Sí</span>' : '<span class="text-slate-400">No</span>'}</td>
-            <td class="p-4 text-xs text-slate-500">${translatedCountries.join(', ')}</td>
+            <td class="p-4 text-xl">
+                ${item.in_worldwide ? '✅' : '❌'}
+            </td>
+            <td class="p-4 text-xs text-slate-500 font-medium">${translatedCountries.join(', ')}</td>
         `;
         container.appendChild(row);
     });
 }
+
 /**
  * ORQUESTADOR DE DATOS
  */
@@ -292,20 +339,21 @@ async function refreshData() {
 const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
-        const [act, int, per, spr, lastUpd] = await Promise.all([
+        const [act, per, spr, lastUpd, summary, surv] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
-            fetch(`${API_BASE}/api/metrics/intensity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/persistence${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/spread${params}`).then(r => r.json()),
-            fetch(`${API_BASE}/api/last_update`).then(r => r.json())
+            fetch(`${API_BASE}/api/last_update`).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/summary${params}`).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/survival${params}`).then(r => r.json())
         ]);
 
         lastSpreadData = spr.data || [];
 
         drawActivity(act.data || [], granularity);
-        drawIntensity(int.data || []);
         drawPersistence(per.data || []);
         drawSpreadTable(spr.data || []);
+        drawSurvival(surv.data || []);
 
         // Actualizar label de "Última actualización"
         if (lastUpd.last_update) {
@@ -313,13 +361,23 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
                 `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
         }
 
-    } catch (e) {
-        console.error("Error al refrescar dashboard:", e);
-    } finally {
-        btn.innerText = 'Actualizar';
-        btn.disabled = false;
+        // Actualización de Cards con datos del Summary
+        const total = summary.total_unique || 0;
+        const globales = summary.total_global || 0;
+        const pct = total > 0 ? ((globales / total) * 100).toFixed(1) : 0;
+
+        document.getElementById('stat-total').innerText = total;
+        document.getElementById('stat-paises').innerText = summary.total_paises || 1;
+        document.getElementById('stat-globales').innerText = globales;
+        document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
+
+        } catch (e) {
+            console.error("Error al refrescar dashboard:", e);
+        } finally {
+            btn.innerText = 'Actualizar';
+            btn.disabled = false;
+        }
     }
-}
 
 /**
  * INICIO
