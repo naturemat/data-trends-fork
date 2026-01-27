@@ -17,7 +17,7 @@ routes_blueprint = Blueprint("routes", __name__)
 # Configuración IA (Groq / OpenAI compatible)
 # ---------------------------------------------------------------------
 # Se ajusta para que coincida con el nombre en el archivo .env de AWS
-GROQ_API_KEY = os.environ.get("GROQCLOUD_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQCLOUD_API_KEY")# Debe decir GROQCLOUD_
 
 client = OpenAI(
     api_key=GROQ_API_KEY,
