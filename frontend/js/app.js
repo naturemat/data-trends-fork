@@ -371,6 +371,8 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
         document.getElementById('stat-globales').innerText = globales;
         document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
 
+        loadTopicStructure();
+        
         } catch (e) {
             console.error("Error al refrescar dashboard:", e);
         } finally {
@@ -382,6 +384,73 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
 /**
  * INICIO
  */
+
+/**
+ * RENDER DE ESTRUCTURA TEMÁTICA (Embeddings)
+ */
+async function loadTopicStructure() {
+    const container = document.getElementById('topic-cards-container');
+    if (!container) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/embeddings/enrich`);
+        const data = await response.json();
+        const trends = data.trends || [];
+
+        if (trends.length === 0) {
+            container.innerHTML = `<p class="col-span-full text-center text-slate-400 italic">No hay datos de enriquecimiento disponibles.</p>`;
+            return;
+        }
+
+        // 1. Agrupar tendencias por tópico
+        const grouped = trends.reduce((acc, item) => {
+            const topic = item.topic || 'Otros';
+            if (!acc[topic]) acc[topic] = [];
+            acc[topic].push(item.trend_text);
+            return acc;
+        }, {});
+
+        // 2. Convertir a array y ordenar por volumen (Top 5)
+        const sortedTopics = Object.entries(grouped)
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, 6); // Tomamos 6 para que el grid se vea lleno
+
+        container.innerHTML = ''; // Limpiar estado de carga
+
+        // 3. Renderizar cada tarjeta
+        sortedTopics.forEach(([topicName, items]) => {
+            // Formatear nombre: "business_&_finance" -> "Business & Finance"
+            const cleanName = topicName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4";
+            
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                        ${cleanName}
+                    </span>
+                    <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+                        ${items.length} temas
+                    </span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    ${items.slice(0, 10).map(t => `
+                        <span class="text-[10px] bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-100 italic">
+                            ${t}
+                        </span>
+                    `).join('')}
+                    ${items.length > 10 ? `<span class="text-[10px] text-slate-400 self-center">...</span>` : ''}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+    } catch (e) {
+        console.error("Error cargando tópicos:", e);
+        container.innerHTML = `<p class="col-span-full text-center text-red-400">Error al conectar con el motor de embeddings.</p>`;
+    }
+}
 
 // Setear fechas por defecto usando la función de fecha local
 const localToday = getLocalTodayString();

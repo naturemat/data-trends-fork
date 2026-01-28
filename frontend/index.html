@@ -200,19 +200,32 @@
                 </div>
             </section>
 
-            <section id="sec-ia" class="content-section hidden">
+            <section id="sec-ia" class="content-section hidden space-y-8">
                 <div class="chart-box space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Resumen Inteligente</h2>
-                            <p class="text-sm text-slate-500">Análisis narrativo generado por IA</p>
+                            <p class="text-sm text-slate-500">Narrativa de tendencias con IA</p>
                         </div>
-                        <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200">
+                        <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
                             ✨ Generar Análisis
                         </button>
                     </div>
                     <div id="ai-response-container" class="hidden p-6 bg-indigo-50 border-l-8 border-indigo-500 rounded-xl">
                         <p id="ai-text" class="text-slate-700 italic leading-relaxed font-medium"></p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">🏷️</span>
+                        <h3 class="text-lg font-bold text-slate-800">Estructura Temática (Top Categorías)</h3>
+                    </div>
+                    
+                    <div id="topic-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="col-span-full py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+                            <p class="text-slate-400 font-medium italic">Los temas se cargarán al procesar los embeddings...</p>
+                        </div>
                     </div>
                 </div>
             </section>
