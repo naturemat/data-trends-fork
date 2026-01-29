@@ -82,13 +82,12 @@ class Trend:
     
     # ---------- METRICAS PARA EL FRONT ----------
     @classmethod
-    def aggregate_activity(
-        cls,
-        pais,
-        dt_from,
-        dt_to,
-        granularity="hour"
-    ):
+    def aggregate_activity(cls, pais, dt_from, dt_to, granularity="hour"):
+        """
+        Calcula la actividad de tendencias, midiendo específicamente cuántas tendencias
+        NUEVAS aparecen en cada intervalo de tiempo comparadas con todo lo visto
+        previamente en el rango seleccionado.
+        """
         if granularity not in ("hour", "day"):
             raise ValueError("granularity debe ser 'hour' o 'day'")
 
@@ -102,19 +101,14 @@ class Trend:
             {
                 "$group": {
                     "_id": {
-                        # Cambio: Agregamos timezone para que la hora 00:00 sea la de Ecuador
                         "$dateTrunc": {
                             "date": "$scraped_at", 
                             "unit": granularity,
                             "timezone": "-05:00"
                         }
                     },
+                    # Agrupamos todos los nombres de tendencias de este bloque temporal
                     "trends_set": {"$addToSet": "$tendencia"}
-                }
-            },
-            {
-                "$project": {
-                    "total_trends": {"$size": "$trends_set"}
                 }
             },
             {"$sort": {"_id": 1}}
@@ -122,14 +116,35 @@ class Trend:
 
         result = list(cls.collection.aggregate(pipeline))
 
-        return [
-            {
-                # Añadimos .isoformat() + "Z" para que el JS sepa que es UTC
-                "timestamp": r["_id"].isoformat() + "Z" if isinstance(r["_id"], datetime) else r["_id"],
-                "total_trends": r["total_trends"]
-            }
-            for r in result
-        ]
+        processed_data = []
+        # Usamos este set para recordar TODO lo que ya hemos contado como "nuevo"
+        trends_seen_so_far = set()
+
+        for i, r in enumerate(result):
+            current_trends = set(r.get("trends_set", []))
+            
+            # En el primer registro del rango (ej. las 00:00), todas son "nuevas"
+            if i == 0:
+                new_trends_count = len(current_trends)
+                trends_seen_so_far.update(current_trends)
+            else:
+                # Lógica de Diferencia:
+                # Tendencias de esta hora que NO han aparecido en ninguna de las horas previas
+                new_trends = current_trends - trends_seen_so_far
+                new_trends_count = len(new_trends)
+                
+                # Actualizamos nuestro registro histórico con los nuevos hallazgos
+                trends_seen_so_far.update(new_trends)
+
+            # Preparamos el objeto para el frontend
+            timestamp_val = r["_id"]
+            processed_data.append({
+                "timestamp": timestamp_val.isoformat() + "Z" if isinstance(timestamp_val, datetime) else timestamp_val,
+                "total_trends_in_period": len(current_trends), # Cuántas había en esa hora
+                "new_trends": new_trends_count                # Cuántas son estrictamente nuevas
+            })
+
+        return processed_data
 
     @classmethod
     def aggregate_persistence(
@@ -194,56 +209,6 @@ class Trend:
                 r["raw_time_units"] = [t.isoformat() for t in r["raw_time_units"]]
                 
         return result
-
-    @classmethod
-    def aggregate_intensity(
-        cls,
-        dt_from: datetime,
-        dt_to: datetime,
-        pais: Optional[str] = None,
-        limit: int = 20
-    ) -> List[Dict]:
-
-        match = {
-            "scraped_at": {
-                "$gte": dt_from,
-                "$lte": dt_to
-            },
-            "numeroDeTwits": {"$ne": None}
-        }
-
-        if pais:
-            match["pais"] = pais
-
-        pipeline = [
-            {"$match": match},
-
-            {
-                "$group": {
-                    "_id": "$tendencia",
-                    "avg_tweets": {"$avg": "$numeroDeTwits"},
-                    "max_tweets": {"$max": "$numeroDeTwits"},
-                    "samples": {"$sum": 1},
-                    "countries": {"$addToSet": "$pais"}
-                }
-            },
-
-            {
-                "$project": {
-                    "_id": 0,
-                    "trend": "$_id",
-                    "avg_tweets": {"$round": ["$avg_tweets", 0]},
-                    "max_tweets": 1,
-                    "samples": 1,
-                    "countries": 1
-                }
-            },
-
-            {"$sort": {"avg_tweets": -1}},
-            {"$limit": limit}
-        ]
-
-        return list(cls.collection.aggregate(pipeline))
     
     @classmethod
     def aggregate_spread(
@@ -335,3 +300,232 @@ class Trend:
         ]
 
         return list(cls.collection.aggregate(pipeline))
+    
+    @classmethod
+    def get_dashboard_summary(cls, pais, dt_from, dt_to, granularity="hour"):
+        # 1. Obtenemos las tendencias únicas que aparecen en el país seleccionado
+        filtro_local = {
+            "scraped_at": {"$gte": dt_from, "$lte": dt_to},
+            "pais": pais
+        }
+        tendencias_en_este_pais = cls.collection.distinct("tendencia", filtro_local)
+
+        if not tendencias_en_este_pais:
+            return {"total_unique": 0, "total_global": 0, "total_paises": 0}
+
+        # 2. Pipeline para calcular métricas de esas tendencias específicas
+        pipeline = [
+            {
+                "$match": {
+                    "scraped_at": {"$gte": dt_from, "$lte": dt_to},
+                    "tendencia": {"$in": tendencias_en_este_pais}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$tendencia",
+                    "locations": {"$addToSet": "$pais"}
+                }
+            },
+            {
+                "$addFields": {
+                    "in_worldwide": {"$in": ["worldwide", "$locations"]},
+                    # Filtramos 'worldwide' para contar solo países reales
+                    "real_countries": {
+                        "$filter": {
+                            "input": "$locations",
+                            "as": "p",
+                            "cond": {"$ne": ["$$p", "worldwide"]}
+                        }
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "is_global": {
+                        "$or": [
+                            {"$eq": ["$in_worldwide", True]},
+                            {"$gte": [{"$size": "$real_countries"}, 10]}
+                        ]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total_unicas": {"$sum": 1},
+                    "total_globales": {"$sum": {"$cond": ["$is_global", 1, 0]}},
+                    "all_locations": {"$push": "$real_countries"}
+                }
+            }
+        ]
+
+        result = list(cls.collection.aggregate(pipeline))
+        if not result:
+            return {"total_unique": 0, "total_global": 0, "total_paises": 0}
+
+        # Aplanamos la lista de países reales para el conteo de la Card
+        paises_reales = {p for sublist in result[0]["all_locations"] for p in sublist}
+        
+        # Lógica solicitada: 
+        # Si filtramos por un país específico, 'Paises analizados' debería ser ese país (1)
+        # Si es worldwide, debería ser el conteo de todos los países donde hay datos.
+        count_paises = len(paises_reales) if pais == "worldwide" else 1
+
+        return {
+            "total_unique": result[0]["total_unicas"],
+            "total_global": result[0]["total_globales"],
+            "total_paises": count_paises
+        }
+    
+    @classmethod
+    def aggregate_synchrony_radar(cls, pais, dt_from, dt_to):
+        pipeline = [
+            # 1. Filtrar rango y solo el país seleccionado + worldwide
+            {"$match": {
+                "scraped_at": {"$gte": dt_from, "$lte": dt_to},
+                "pais": {"$in": [pais, "worldwide"]}
+            }},
+            # 2. Agrupar por hora y país para tener la lista de tendencias
+            {
+                "$group": {
+                    "_id": {
+                        "hour": {"$hour": "$scraped_at"},
+                        "pais": "$pais"
+                    },
+                    "trends": {"$addToSet": "$tendencia"}
+                }
+            },
+            # 3. Re-agrupar solo por hora para tener ambos sets de tendencias juntos
+            {
+                "$group": {
+                    "_id": "$_id.hour",
+                    "sets": {
+                        "$push": {
+                            "p": "$_id.pais",
+                            "t": "$trends"
+                        }
+                    }
+                }
+            },
+            # 4. Calcular Intersección y Unión entre Worldwide y el País
+            {
+                "$project": {
+                    "hour": "$_id",
+                    "worldwide_set": {
+                        "$filter": {"input": "$sets", "as": "s", "cond": {"$eq": ["$$s.p", "worldwide"]}}
+                    },
+                    "local_set": {
+                        "$filter": {"input": "$sets", "as": "s", "cond": {"$eq": ["$$s.p", pais]}}
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "hour": 1,
+                    "intersection": {"$size": {"$setIntersection": [
+                        {"$arrayElemAt": ["$worldwide_set.t", 0]},
+                        {"$arrayElemAt": ["$local_set.t", 0]}
+                    ]}},
+                    "union": {"$size": {"$setUnion": [
+                        {"$arrayElemAt": ["$worldwide_set.t", 0]},
+                        {"$arrayElemAt": ["$local_set.t", 0]}
+                    ]}}
+                }
+            },
+            # 5. Calcular porcentaje final de sincronía
+            {
+                "$project": {
+                    "hour": 1,
+                    "sync_index": {
+                        "$cond": [
+                            {"$gt": ["$union", 0]},
+                            {"$multiply": [{"$divide": ["$intersection", "$union"]}, 100]},
+                            0
+                        ]
+                    }
+                }
+            },
+            {"$sort": {"hour": 1}}
+        ]
+        return list(cls.collection.aggregate(pipeline))
+    
+    @classmethod
+    def aggregate_survival_stats(cls, pais, dt_from, dt_to, granularity="hour"):
+        if granularity == "hour":
+            bins = [0, 3, 9, 24]
+            labels = ["Fugaz (<3h)", "Activa (3-8h)", "Persistente (9-23h)", "Inmortal (>=24h)"]
+        else:
+            bins = [0, 1, 3, 7]
+            labels = ["Efímera (<1d)", "Estable (1-2d)", "Semanal (3-6d)", "Histórica (>=7d)"]
+
+        pipeline = [
+            {"$match": {"scraped_at": {"$gte": dt_from, "$lte": dt_to}, "pais": pais}},
+            {
+                "$addFields": {
+                    "time_unit": {
+                        "$dateTrunc": {
+                            "date": "$scraped_at",
+                            "unit": granularity,
+                            "timezone": "-05:00"
+                        }
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": {"$trim": {"input": "$tendencia"}},
+                    "duration": {"$addToSet": "$time_unit"}
+                }
+            },
+            {
+                "$project": {
+                    "trend_name": "$_id", # Guardamos el nombre
+                    "total_units": {"$size": "$duration"}
+                }
+            },
+            # --- PASO CLAVE: Ordenar por duración descendente ---
+            {"$sort": {"total_units": -1}}, 
+            {
+                "$bucket": {
+                    "groupBy": "$total_units",
+                    "boundaries": bins,
+                    "default": "Superior",
+                    "output": { 
+                        "count": { "$sum": 1 },
+                        "trends": { "$push": "$trend_name" } # El $push mantendrá el orden del $sort
+                    }
+                }
+            }
+        ]
+        
+        raw_data = list(cls.collection.aggregate(pipeline))
+        
+        # Usamos los límites como llaves para mapear fácil
+        conteo_final = {b: 0 for b in bins}
+        conteo_final["Superior"] = 0
+
+        for item in raw_data:
+            conteo_final[item["_id"]] = item["count"]
+
+        # Formatear para el frontend
+        formatted = []
+        for i, b in enumerate(bins):
+            label = labels[i]
+            item_data = next((x for x in raw_data if x["_id"] == b), {"count": 0, "trends": []})
+            
+            count = item_data["count"]
+            trends = item_data["trends"]
+
+            if i == len(bins) - 1:
+                sup = next((x for x in raw_data if x["_id"] == "Superior"), {"count": 0, "trends": []})
+                count += sup["count"]
+                trends += sup["trends"]
+
+            formatted.append({
+                "label": label,
+                "count": count,
+                "topTrends": trends[:3] # Enviamos solo las primeras 3 para el tooltip
+            })
+        
+        return formatted

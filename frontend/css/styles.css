@@ -1,0 +1,325 @@
+/* DataTrendX - Hoja de Estilos de Rediseño Profesional 
+    Tipografía: Inter
+*/
+
+:root {
+    --primary-blue: #2563eb;    /* Azul de cabecera */
+    --primary-dark: #1d4ed8;
+    --card-green: #5eb49a;      /* Verde Esmeralda Suave */
+    --card-blue: #90c2ff;       /* Azul Cielo */
+    --card-purple: #b4aff2;     /* Violeta Pastel */
+    --bg-body: #f8fafc;
+    --sidebar-text: #64748b;
+}
+
+/* Forzamos a que el navegador use 'Inter' sobre cualquier otra cosa */
+* {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
+/* --- Base y Reset --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-body);
+    color: #1e293b;
+    overflow: hidden; /* Evita scroll en el body, lo maneja el main */
+}
+
+/* --- Barra Lateral (Sidebar) --- */
+.sidebar {
+    transition: all 0.3s ease;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    color: var(--sidebar-text);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    margin-bottom: 6px;
+}
+
+.nav-link:hover {
+    background-color: #f1f5f9;
+    color: var(--primary-blue);
+}
+
+.nav-link.active {
+    background-color: var(--primary-blue);
+    color: #ffffff !important;
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+.nav-link .icon {
+    font-size: 1.2rem;
+}
+
+/* --- Cabecera (Header) --- */
+header {
+    background-color: var(--primary-blue);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+header select, header input {
+    color: white;
+    cursor: pointer;
+}
+
+header select option {
+    color: #1e293b;
+}
+
+header #last-update, 
+header span, 
+header label {
+    text-shadow: 
+        1px 1px 0px #000, 
+        1px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+header select, 
+header input {
+    text-shadow: 1px 1px 2px #000;
+    font-weight: 800 !important;
+}
+
+/* Botón de Actualizar en Header */
+#btn-update {
+    transition: all 0.2s ease;
+}
+
+#btn-update:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#btn-update:active {
+    transform: translateY(0);
+}
+
+/* --- Rediseño de Cards Llamativas --- */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    padding: 2rem 1.5rem;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: white;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.2);
+}
+
+.card-icon {
+    font-size: 2.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    backdrop-filter: blur(5px);
+}
+
+.card-content h3 {
+    font-family: 'Montserrat', sans-serif !important;
+    font-size: 3.2rem !important;
+    font-weight: 900 !important;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+}
+
+.card-content p {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 800;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.85;
+}
+
+.stat-card .card-content h3 {
+    text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.3), 
+                 0px 0px 15px rgba(0, 0, 0, 0.1);
+    letter-spacing: -0.04em !important; /* Ajuste fino para Montserrat 900 */
+}
+
+/* Reforzamos el texto descriptivo inferior */
+.stat-card .card-content p {
+    text-shadow: 
+        1px 1px 1px #000, 
+        1px 2px 3px rgba(0, 0, 0, 0.7);
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* Efecto de resplandor interno */
+.card-glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+}
+
+.stat-card:hover .card-glow {
+    opacity: 1;
+}
+
+/* Colores Gradientes Ultra-Vibrantes */
+.card-green {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+}
+
+.card-blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4);
+}
+
+.card-purple {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4);
+}
+
+/* --- Contenedores de Gráficos --- */
+.chart-box {
+    background: #ffffff;
+    padding: 2rem;
+    border-radius: 28px;
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.chart-title {
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    margin-bottom: 1.5rem;
+    display: block;
+}
+
+.chart-container {
+    position: relative;
+    /* !important asegura que Chart.js lea bien la altura desde el segundo 1 */
+    height: 300px !important; 
+    width: 100% !important;
+}
+
+/* --- Tabla de Alcance (Estilo Premium) --- */
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.custom-table thead th {
+    background-color: #f1f5f9; /* Color gris de cabecera de tabla */
+    padding: 16px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    text-align: center;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.custom-table tbody td {
+    padding: 18px 16px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    font-weight: 500;
+}
+
+.custom-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.custom-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+/* --- Badges de Alcance (Colores Solicitados) --- */
+.badge {
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+/* Global -> Violeta */
+.badge-global { 
+    background-color: #f5f3ff !important; 
+    color: #7c3aed !important;
+    border: 1px solid #ddd6fe;
+}
+
+/* Regional -> Celeste */
+.badge-regional { 
+    background-color: #f0f9ff !important; 
+    color: #0ea5e9 !important;
+    border: 1px solid #bae6fd;
+}
+
+/* Local -> Verde */
+.badge-local { 
+    background-color: #f0fdf4 !important; 
+    color: #22c55e !important;
+    border: 1px solid #bbf7d0;
+}
+
+/* --- Animaciones de Carga --- */
+.content-section {
+    animation: fadeInSection 0.5s ease-out;
+}
+
+@keyframes fadeInSection {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Scrollbar Personalizada --- */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

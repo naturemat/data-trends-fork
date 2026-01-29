@@ -6,7 +6,8 @@
 const chartInstances = {};
 
 let API_BASE = "";
-let lastSpreadData = [];
+let lastPersistenceData = [];
+let chartAiCategories = null;
 
 /**
  * UTILIDADES
@@ -78,7 +79,9 @@ function formatToLocalTime(isoString, showTime = true) {
 
 function getLocalTodayString() {
     const now = new Date();
-    return now.toISOString().split('T')[0];
+    const offset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now - offset)).toISOString().split('T')[0];
+    return localISOTime;
 }
 
 function getUTCRange() {
@@ -106,7 +109,7 @@ const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } }
+        legend: { position: 'top', labels: { boxWidth: 10, font: {family: "'Montserrat', sans-serif", size: 11 } } }
     },
     scales: {
         y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
@@ -126,29 +129,55 @@ function drawActivity(data, granularity) {
     if (chartInstances.activity) chartInstances.activity.destroy();
 
     const showTime = (granularity === 'hour');
+    
+    // CAMBIO: Ahora usamos 'new_trends' para el máximo y los datos
+    const maxValue = Math.max(...data.map(d => d.new_trends), 0);
+    // Ajuste dinámico del eje Y: si hay pocas nuevas, el techo es 10, si hay muchas, sube de 10 en 10
+    const yMax = maxValue > 10 ? Math.ceil((maxValue + 1) / 10) * 10 : 10;
 
     chartInstances.activity = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(d => formatToLocalTime(d.timestamp, showTime)),
             datasets: [{
-                label: 'Tendencias Únicas Detectadas',
-                data: data.map(d => d.total_trends),
+                label: 'Nuevas Tendencias',
+                data: data.map(d => d.new_trends), // CAMBIO AQUÍ
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37, 99, 235, 0.1)',
                 fill: true,
-                tension: 0.3,
-                pointRadius: 3,
-                pointHoverRadius: 5
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointHoverRadius: 6
             }]
         },
         options: {
-            ...chartOptions,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: yMax, 
+                    ticks: {
+                        stepSize: 10,
+                        precision: 0
+                    },
+                    grid: { color: '#f1f5f9' }
+                },
+                x: {
+                    ticks: { font: {family: "'Montserrat', sans-serif", size: 10 }, maxRotation: 45 },
+                    grid: { display: false }
+                }
+            },
             plugins: {
-                ...chartOptions.plugins,
+                legend: { display: false },
                 tooltip: {
+                    backgroundColor: '#1e293b',
+                    padding: 12,
                     callbacks: {
-                        title: (items) => `Fecha/Hora: ${items[0].label}`
+                        title: (items) => `📅 ${items[0].label}`,
+                        label: (item) => ` Temas nuevos: ${item.raw}` // CAMBIO AQUÍ
                     }
                 }
             }
@@ -156,33 +185,65 @@ function drawActivity(data, granularity) {
     });
 }
 
-function drawIntensity(data) {
-    const ctx = document.getElementById('chart-intensity').getContext('2d');
-    if (chartInstances.intensity) chartInstances.intensity.destroy();
+function drawSurvival(data) {
+    const canvas = document.getElementById('chart-impact');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (chartInstances.survival) chartInstances.survival.destroy();
 
-    chartInstances.intensity = new Chart(ctx, {
-        type: 'line',
+    const aiColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+
+    chartInstances.survival = new Chart(ctx, {
+        type: 'bar',
         data: {
-            labels: data.map(d => d.trend),
-            datasets: [
-                {
-                    label: 'Máximo Tweets',
-                    data: data.map(d => d.max_tweets),
-                    borderColor: '#94a3b8',
-                    borderDash: [5, 5],
-                    fill: false
-                },
-                {
-                    label: 'Promedio Tweets',
-                    data: data.map(d => d.avg_tweets),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: true,
-                    tension: 0.2
-                }
-            ]
+            labels: data.map(d => d.label),
+            datasets: [{
+                label: 'Cantidad de Tendencias',
+                data: data.map(d => d.count),
+                backgroundColor: aiColors.map(color => color + 'dd'),
+                borderColor: aiColors,
+                borderWidth: 2,
+                borderRadius: 8,
+                hoverBackgroundColor: aiColors,
+            }]
         },
-        options: chartOptions
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    callbacks: {
+                        label: (context) => ` Total: ${context.raw} tendencias`,
+                        afterBody: function(context) {
+                            const index = context[0].dataIndex;
+                            const trends = data[index].topTrends || [];
+                            
+                            if (trends.length === 0) return '';
+                            
+                            let text = ['\nTop 3 temas:'];
+                            trends.slice(0, 3).forEach((t, i) => {
+                                text.push(`${i + 1}. ${t}`);
+                            });
+                            return text;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { precision: 0, font: {family: "'Montserrat', sans-serif", weight: '600' } },
+                    grid: { color: '#f1f5f9' }
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { font: {family: "'Montserrat', sans-serif", weight: '700' } }
+                }
+            }
+        }
     });
 }
 
@@ -235,7 +296,7 @@ function drawPersistence(data) {
                 y: {
                     ticks: {
                         autoSkip: false, // Forzar que muestre los nombres
-                        font: { size: 11 }
+                        font: {family: "'Montserrat', sans-serif", size: 11 }
                     }
                 }
             }
@@ -245,28 +306,32 @@ function drawPersistence(data) {
 
 function drawSpreadTable(data) {
     const container = document.getElementById('table-spread-body');
+    if (!container) return; 
     container.innerHTML = '';
 
     data.forEach(item => {
-        // Traducimos cada país de la lista
         const translatedCountries = item.countries.map(c => countryTranslations[c] || c);
         
+        const scopeKey = item.scope.toLowerCase(); 
+        const badgeClass = `badge-${scopeKey}`;
+
         const row = document.createElement('tr');
-        row.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
         row.innerHTML = `
             <td class="p-4 font-semibold text-blue-600">${item.trend}</td>
             <td class="p-4">
-                <span class="px-2 py-1 rounded text-xs font-bold uppercase ${
-                    item.scope === 'global' ? 'bg-purple-100 text-purple-700' : 
-                    item.scope === 'regional' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                }">${item.scope === 'global' ? 'Global' : item.scope === 'regional' ? 'Regional' : 'Local'}</span>
+                <span class="badge ${badgeClass}">
+                    ${item.scope === 'global' ? 'Global' : item.scope === 'regional' ? 'Regional' : 'Local'}
+                </span>
             </td>
-            <td class="p-4">${item.in_worldwide ? '🌎 <span class="text-green-600">Sí</span>' : '<span class="text-slate-400">No</span>'}</td>
-            <td class="p-4 text-xs text-slate-500">${translatedCountries.join(', ')}</td>
+            <td class="p-4 text-xl">
+                ${item.in_worldwide ? '✅' : '❌'}
+            </td>
+            <td class="p-4 text-xs text-slate-500 font-medium">${translatedCountries.join(', ')}</td>
         `;
         container.appendChild(row);
     });
 }
+
 /**
  * ORQUESTADOR DE DATOS
  */
@@ -292,20 +357,21 @@ async function refreshData() {
 const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
-        const [act, int, per, spr, lastUpd] = await Promise.all([
+        const [act, per, spr, lastUpd, summary, surv] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
-            fetch(`${API_BASE}/api/metrics/intensity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/persistence${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/spread${params}`).then(r => r.json()),
-            fetch(`${API_BASE}/api/last_update`).then(r => r.json())
+            fetch(`${API_BASE}/api/last_update`).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/summary${params}`).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/survival${params}`).then(r => r.json())
         ]);
 
-        lastSpreadData = spr.data || [];
+        lastPersistenceData = per.data || [];
 
         drawActivity(act.data || [], granularity);
-        drawIntensity(int.data || []);
         drawPersistence(per.data || []);
         drawSpreadTable(spr.data || []);
+        drawSurvival(surv.data || []);
 
         // Actualizar label de "Última actualización"
         if (lastUpd.last_update) {
@@ -313,13 +379,45 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
                 `Último scrapeo detectado: ${formatToLocalTime(lastUpd.last_update)}`;
         }
 
-    } catch (e) {
-        console.error("Error al refrescar dashboard:", e);
-    } finally {
-        btn.innerText = 'Actualizar';
-        btn.disabled = false;
+        // Actualización de Cards con datos del Summary
+        const total = summary.total_unique || 0;
+        const globales = summary.total_global || 0;
+        const pct = total > 0 ? ((globales / total) * 100).toFixed(1) : 0;
+
+        document.getElementById('stat-total').innerText = total;
+        document.getElementById('stat-paises').innerText = summary.total_paises || 1;
+        document.getElementById('stat-globales').innerText = globales;
+        document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
+        
+        // Limpiar la sección de IA al actualizar filtros
+        const topicContainer = document.getElementById('topic-cards-container');
+        if (topicContainer) {
+            topicContainer.innerHTML = `
+                <div class="col-span-full py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+                    <p class="text-slate-400 font-medium italic">Datos actualizados. Presiona el botón superior para clasificar...</p>
+                </div>`;
+        }
+        document.getElementById('ai-response-container').classList.add('hidden');
+
+        if (chartInstances.aiCategories) {
+            chartInstances.aiCategories.destroy();
+            chartInstances.aiCategories = null; // Liberar memoria
+            
+            // Opcional: Limpiar el canvas visualmente para que no quede el último frame
+            const aiCanvas = document.getElementById('chart-ai-categories');
+            if (aiCanvas) {
+                const ctx = aiCanvas.getContext('2d');
+                ctx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+            }
+        }
+
+        } catch (e) {
+            console.error("Error al refrescar dashboard:", e);
+        } finally {
+            btn.innerText = 'Actualizar';
+            btn.disabled = false;
+        }
     }
-}
 
 /**
  * INICIO
@@ -338,51 +436,138 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     const btn = document.getElementById('btn-ai');
     const container = document.getElementById('ai-response-container');
     const textField = document.getElementById('ai-text');
-    const paisSelector = document.getElementById('filter-pais');
-    const nombrePais = paisSelector.options[paisSelector.selectedIndex].text;
+    const paisCodigo = document.getElementById('filter-pais').value;
+    
+    // Obtenemos el nombre legible del país (ej: "Ecuador" en lugar de "ecuador")
+    const paisNombre = countryTranslations[paisCodigo] || paisCodigo;
+    
+    const range = getUTCRange();
+    const params = `?pais=${paisCodigo}&date_from=${range.from}&date_to=${range.to}`;
 
-    if (!lastSpreadData || lastSpreadData.length === 0) {
+    // Validamos la nueva variable
+    if (!lastPersistenceData || lastPersistenceData.length === 0) {
         alert("Primero carga los datos con el botón 'Actualizar'");
         return;
     }
 
-    // UI State
     btn.disabled = true;
-    btn.innerHTML = `
-        <svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        Analizando...
-    `;
-    
+    btn.innerHTML = `⏳ Analizando persistencia...`;
     container.classList.remove('hidden');
-    textField.innerText = "La IA está examinando las tendencias actuales...";
+    textField.innerText = "La IA está examinando los temas más estables en el tiempo...";
 
     try {
-        const response = await fetch(`${API_BASE}/api/ai_summary`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                data: lastSpreadData,
-                pais_nombre: nombrePais
-            })
-        });
+        const [resSummary, resClass] = await Promise.all([
+            fetch(`${API_BASE}/api/ai_summary`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // ENVIAMOS PERSISTENCIA Y NOMBRE BONITO
+                body: JSON.stringify({ 
+                    data: lastPersistenceData, 
+                    pais_nombre: paisNombre 
+                })
+            }).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/ai_classification${params}`).then(r => r.json())
+        ]);
 
-        const result = await response.json();
+        textField.innerText = resSummary.summary || "No se pudo generar el resumen.";
 
-        if (response.ok) {
-            textField.innerText = result.summary;
-        } else {
-            textField.innerText = "Error: " + (result.summary || result.error || "No se pudo generar");
+        if (resClass && !resClass.error) {
+            renderAiClassification(resClass);
         }
+
     } catch (error) {
-        console.error("Error en AI:", error);
-        textField.innerText = "Error de conexión con el servidor.";
+        console.error("Error en el motor de IA:", error);
+        textField.innerText = "Error de conexión con los servicios de IA.";
     } finally {
         btn.disabled = false;
         btn.innerText = "✨ Generar Análisis";
     }
 });
 
-// Función para inicializar la aplicación
+function renderAiClassification(data) {
+    const container = document.getElementById('topic-cards-container');
+    const canvas = document.getElementById('chart-ai-categories');
+    if (!container || !canvas) return;
+
+    container.innerHTML = ''; // Limpiar mensaje de espera
+    
+    // 1. Convertir el objeto en una lista y ORDENAR por cantidad de tendencias (descendente)
+    const sortedCategories = Object.entries(data)
+        .filter(([_, trends]) => trends.length > 0) // Solo categorías con datos
+        .sort((a, b) => b[1].length - a[1].length); // Ordenar: mayor a menor
+
+    const labels = [];
+    const counts = [];
+    // Paleta de colores consistente
+    const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#94a3b8'];
+
+    // 2. Iterar sobre los datos YA ORDENADOS
+    sortedCategories.forEach(([category, trends], index) => {
+        labels.push(category);
+        counts.push(trends.length);
+
+        const currentColor = colors[index % colors.length];
+
+        // Crear Tarjeta con el color sincronizado
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 border-t-4";
+        card.style.borderTopColor = currentColor; // Sincronización con el gráfico
+        
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <span class="font-black text-xs uppercase tracking-widest text-slate-800">${category}</span>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full" 
+                      style="background-color: ${currentColor}20; color: ${currentColor}">
+                    ${trends.length} temas
+                </span>
+            </div>
+            <div class="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                ${trends.map(t => `
+                    <span class="text-[12px] sm:text-[13px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold shadow-sm hover:bg-white transition-colors">
+                        ${t}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(card);
+    });
+
+    // 3. Dibujar Gráfico (ya recibirá las etiquetas y conteos ordenados)
+    if (chartInstances.aiCategories) chartInstances.aiCategories.destroy();
+    
+    chartInstances.aiCategories = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length), // Usar solo los colores necesarios
+                borderWidth: 0,
+                hoverOffset: 15
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    position: 'bottom', 
+                    labels: { 
+                        boxWidth: 12, 
+                        padding: 15,
+                        font: { size: 10, weight: 'bold', family: "'Montserrat', sans-serif",} 
+                    } 
+                }
+            },
+            cutout: '70%',
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            }
+        }
+    });
+}
+
 // Función para inicializar la aplicación
 async function initApp() {
     try {
