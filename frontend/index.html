@@ -6,9 +6,20 @@
     <link rel="icon" type="image/png" href="/assets/logo.png">
     <title>DataTrendX</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            sans: ['Montserrat', 'sans-serif'],
+                        },
+                    }
+                }
+            }
+        </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <link rel="stylesheet" href="/css/styles.css">
@@ -204,27 +215,39 @@
                 <div class="chart-box space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Resumen Inteligente</h2>
-                            <p class="text-sm text-slate-500">Narrativa de tendencias con IA</p>
+                            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Análisis Predictivo e Inteligente</h2>
+                            <p class="text-sm text-slate-500">Clasificación por IA y Narrativa de Contexto</p>
                         </div>
                         <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
-                            ✨ Generar Análisis
+                            ✨ Generar Análisis con IA
                         </button>
                     </div>
-                    <div id="ai-response-container" class="hidden p-6 bg-indigo-50 border-l-8 border-indigo-500 rounded-xl">
-                        <p id="ai-text" class="text-slate-700 italic leading-relaxed font-medium"></p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-1 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase mb-4 text-center">Distribución Temática</h3>
+                            <div class="relative h-[250px] w-full"> 
+                                <canvas id="chart-ai-categories"></canvas>
+                            </div>
+                        </div>
+                        <div id="ai-response-container" class="lg:col-span-2 hidden p-6 bg-indigo-50 border-l-8 border-indigo-500 rounded-xl">
+                            <h3 class="text-indigo-900 font-bold mb-2 flex items-center gap-2">
+                                <span>📝</span> Resumen Ejecutivo
+                            </h3>
+                            <p id="ai-text" class="text-slate-700 italic leading-relaxed font-medium whitespace-pre-line"></p>
+                        </div>
                     </div>
                 </div>
 
                 <div class="space-y-4">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-lg">🏷️</span>
-                        <h3 class="text-lg font-bold text-slate-800">Estructura Temática (Top Categorías)</h3>
+                        <h3 class="text-lg font-bold text-slate-800">Tendencias por Categoría</h3>
                     </div>
                     
                     <div id="topic-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="col-span-full py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
-                            <p class="text-slate-400 font-medium italic">Los temas se cargarán al procesar los embeddings...</p>
+                            <p class="text-slate-400 font-medium italic">Presiona el botón superior para clasificar las tendencias...</p>
                         </div>
                     </div>
                 </div>

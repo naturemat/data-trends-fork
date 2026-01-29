@@ -12,6 +12,11 @@
     --sidebar-text: #64748b;
 }
 
+/* Forzamos a que el navegador use 'Inter' sobre cualquier otra cosa */
+* {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
 /* --- Base y Reset --- */
 * {
     margin: 0;
@@ -75,6 +80,20 @@ header select option {
     color: #1e293b;
 }
 
+header #last-update, 
+header span, 
+header label {
+    text-shadow: 
+        1px 1px 0px #000, 
+        1px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+header select, 
+header input {
+    text-shadow: 1px 1px 2px #000;
+    font-weight: 800 !important;
+}
+
 /* Botón de Actualizar en Header */
 #btn-update {
     transition: all 0.2s ease;
@@ -121,19 +140,36 @@ header select option {
 }
 
 .card-content h3 {
+    font-family: 'Montserrat', sans-serif !important;
     font-size: 3.2rem !important;
     font-weight: 900 !important;
-    line-height: 1;
-    margin: 0;
-    text-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
 }
 
 .card-content p {
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 800;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    opacity: 0.9;
+    letter-spacing: 0.05em;
+    opacity: 0.85;
+}
+
+.stat-card .card-content h3 {
+    text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.3), 
+                 0px 0px 15px rgba(0, 0, 0, 0.1);
+    letter-spacing: -0.04em !important; /* Ajuste fino para Montserrat 900 */
+}
+
+/* Reforzamos el texto descriptivo inferior */
+.stat-card .card-content p {
+    text-shadow: 
+        1px 1px 1px #000, 
+        1px 2px 3px rgba(0, 0, 0, 0.7);
+    font-weight: 800 !important;
+    letter-spacing: 0.08em !important;
 }
 
 /* Efecto de resplandor interno */

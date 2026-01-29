@@ -475,28 +475,32 @@ class Trend:
             {
                 "$group": {
                     "_id": {"$trim": {"input": "$tendencia"}},
-                    # Contamos unidades de tiempo únicas (igual que en persistencia)
                     "duration": {"$addToSet": "$time_unit"}
                 }
             },
             {
                 "$project": {
+                    "trend_name": "$_id", # Guardamos el nombre
                     "total_units": {"$size": "$duration"}
                 }
             },
+            # --- PASO CLAVE: Ordenar por duración descendente ---
+            {"$sort": {"total_units": -1}}, 
             {
                 "$bucket": {
                     "groupBy": "$total_units",
                     "boundaries": bins,
                     "default": "Superior",
-                    "output": { "count": { "$sum": 1 } }
+                    "output": { 
+                        "count": { "$sum": 1 },
+                        "trends": { "$push": "$trend_name" } # El $push mantendrá el orden del $sort
+                    }
                 }
             }
         ]
         
         raw_data = list(cls.collection.aggregate(pipeline))
         
-        # Inicializamos el diccionario de resultados con ceros
         # Usamos los límites como llaves para mapear fácil
         conteo_final = {b: 0 for b in bins}
         conteo_final["Superior"] = 0
@@ -508,15 +512,20 @@ class Trend:
         formatted = []
         for i, b in enumerate(bins):
             label = labels[i]
-            count = conteo_final[b]
+            item_data = next((x for x in raw_data if x["_id"] == b), {"count": 0, "trends": []})
             
-            # Si es el último rango (Inmortal), le sumamos los que superaron el límite (Superior)
+            count = item_data["count"]
+            trends = item_data["trends"]
+
             if i == len(bins) - 1:
-                count += conteo_final["Superior"]
-            
+                sup = next((x for x in raw_data if x["_id"] == "Superior"), {"count": 0, "trends": []})
+                count += sup["count"]
+                trends += sup["trends"]
+
             formatted.append({
-                "label": f"{label} [{count}]",
-                "count": count
+                "label": label,
+                "count": count,
+                "topTrends": trends[:3] # Enviamos solo las primeras 3 para el tooltip
             })
         
         return formatted

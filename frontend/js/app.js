@@ -6,7 +6,8 @@
 const chartInstances = {};
 
 let API_BASE = "";
-let lastSpreadData = [];
+let lastPersistenceData = [];
+let chartAiCategories = null;
 
 /**
  * UTILIDADES
@@ -108,7 +109,7 @@ const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } }
+        legend: { position: 'top', labels: { boxWidth: 10, font: {family: "'Montserrat', sans-serif", size: 11 } } }
     },
     scales: {
         y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
@@ -165,7 +166,7 @@ function drawActivity(data, granularity) {
                     grid: { color: '#f1f5f9' }
                 },
                 x: {
-                    ticks: { font: { size: 10 }, maxRotation: 45 },
+                    ticks: { font: {family: "'Montserrat', sans-serif", size: 10 }, maxRotation: 45 },
                     grid: { display: false }
                 }
             },
@@ -191,20 +192,20 @@ function drawSurvival(data) {
     
     if (chartInstances.survival) chartInstances.survival.destroy();
 
+    const aiColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+
     chartInstances.survival = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: data.map(d => d.label),
             datasets: [{
+                label: 'Cantidad de Tendencias',
                 data: data.map(d => d.count),
-                backgroundColor: [
-                    '#ef4444', // Rojo (Fugaz)
-                    '#f59e0b', // Naranja (Activa)
-                    '#3b82f6', // Azul (Persistente)
-                    '#10b981'  // Verde (Inmortal)
-                ],
-                borderRadius: 6,
-                barThickness: 40
+                backgroundColor: aiColors.map(color => color + 'dd'),
+                borderColor: aiColors,
+                borderWidth: 2,
+                borderRadius: 8,
+                hoverBackgroundColor: aiColors,
             }]
         },
         options: {
@@ -213,17 +214,34 @@ function drawSurvival(data) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#1e293b',
-                    padding: 12
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    callbacks: {
+                        label: (context) => ` Total: ${context.raw} tendencias`,
+                        afterBody: function(context) {
+                            const index = context[0].dataIndex;
+                            const trends = data[index].topTrends || [];
+                            
+                            if (trends.length === 0) return '';
+                            
+                            let text = ['\nTop 3 temas:'];
+                            trends.slice(0, 3).forEach((t, i) => {
+                                text.push(`${i + 1}. ${t}`);
+                            });
+                            return text;
+                        }
+                    }
                 }
             },
             scales: {
                 y: { 
                     beginAtZero: true, 
-                    ticks: { precision: 0 },
+                    ticks: { precision: 0, font: {family: "'Montserrat', sans-serif", weight: '600' } },
                     grid: { color: '#f1f5f9' }
                 },
-                x: { grid: { display: false } }
+                x: { 
+                    grid: { display: false },
+                    ticks: { font: {family: "'Montserrat', sans-serif", weight: '700' } }
+                }
             }
         }
     });
@@ -278,7 +296,7 @@ function drawPersistence(data) {
                 y: {
                     ticks: {
                         autoSkip: false, // Forzar que muestre los nombres
-                        font: { size: 11 }
+                        font: {family: "'Montserrat', sans-serif", size: 11 }
                     }
                 }
             }
@@ -348,7 +366,7 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
             fetch(`${API_BASE}/api/metrics/survival${params}`).then(r => r.json())
         ]);
 
-        lastSpreadData = spr.data || [];
+        lastPersistenceData = per.data || [];
 
         drawActivity(act.data || [], granularity);
         drawPersistence(per.data || []);
@@ -370,9 +388,29 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
         document.getElementById('stat-paises').innerText = summary.total_paises || 1;
         document.getElementById('stat-globales').innerText = globales;
         document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
-
-        loadTopicStructure();
         
+        // Limpiar la sección de IA al actualizar filtros
+        const topicContainer = document.getElementById('topic-cards-container');
+        if (topicContainer) {
+            topicContainer.innerHTML = `
+                <div class="col-span-full py-10 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+                    <p class="text-slate-400 font-medium italic">Datos actualizados. Presiona el botón superior para clasificar...</p>
+                </div>`;
+        }
+        document.getElementById('ai-response-container').classList.add('hidden');
+
+        if (chartInstances.aiCategories) {
+            chartInstances.aiCategories.destroy();
+            chartInstances.aiCategories = null; // Liberar memoria
+            
+            // Opcional: Limpiar el canvas visualmente para que no quede el último frame
+            const aiCanvas = document.getElementById('chart-ai-categories');
+            if (aiCanvas) {
+                const ctx = aiCanvas.getContext('2d');
+                ctx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+            }
+        }
+
         } catch (e) {
             console.error("Error al refrescar dashboard:", e);
         } finally {
@@ -384,73 +422,6 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
 /**
  * INICIO
  */
-
-/**
- * RENDER DE ESTRUCTURA TEMÁTICA (Embeddings)
- */
-async function loadTopicStructure() {
-    const container = document.getElementById('topic-cards-container');
-    if (!container) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/api/embeddings/enrich`);
-        const data = await response.json();
-        const trends = data.trends || [];
-
-        if (trends.length === 0) {
-            container.innerHTML = `<p class="col-span-full text-center text-slate-400 italic">No hay datos de enriquecimiento disponibles.</p>`;
-            return;
-        }
-
-        // 1. Agrupar tendencias por tópico
-        const grouped = trends.reduce((acc, item) => {
-            const topic = item.topic || 'Otros';
-            if (!acc[topic]) acc[topic] = [];
-            acc[topic].push(item.trend_text);
-            return acc;
-        }, {});
-
-        // 2. Convertir a array y ordenar por volumen (Top 5)
-        const sortedTopics = Object.entries(grouped)
-            .sort((a, b) => b[1].length - a[1].length)
-            .slice(0, 6); // Tomamos 6 para que el grid se vea lleno
-
-        container.innerHTML = ''; // Limpiar estado de carga
-
-        // 3. Renderizar cada tarjeta
-        sortedTopics.forEach(([topicName, items]) => {
-            // Formatear nombre: "business_&_finance" -> "Business & Finance"
-            const cleanName = topicName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            
-            const card = document.createElement('div');
-            card.className = "bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4";
-            
-            card.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                        ${cleanName}
-                    </span>
-                    <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-                        ${items.length} temas
-                    </span>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                    ${items.slice(0, 10).map(t => `
-                        <span class="text-[10px] bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-100 italic">
-                            ${t}
-                        </span>
-                    `).join('')}
-                    ${items.length > 10 ? `<span class="text-[10px] text-slate-400 self-center">...</span>` : ''}
-                </div>
-            `;
-            container.appendChild(card);
-        });
-
-    } catch (e) {
-        console.error("Error cargando tópicos:", e);
-        container.innerHTML = `<p class="col-span-full text-center text-red-400">Error al conectar con el motor de embeddings.</p>`;
-    }
-}
 
 // Setear fechas por defecto usando la función de fecha local
 const localToday = getLocalTodayString();
@@ -465,51 +436,138 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     const btn = document.getElementById('btn-ai');
     const container = document.getElementById('ai-response-container');
     const textField = document.getElementById('ai-text');
-    const paisSelector = document.getElementById('filter-pais');
-    const nombrePais = paisSelector.options[paisSelector.selectedIndex].text;
+    const paisCodigo = document.getElementById('filter-pais').value;
+    
+    // Obtenemos el nombre legible del país (ej: "Ecuador" en lugar de "ecuador")
+    const paisNombre = countryTranslations[paisCodigo] || paisCodigo;
+    
+    const range = getUTCRange();
+    const params = `?pais=${paisCodigo}&date_from=${range.from}&date_to=${range.to}`;
 
-    if (!lastSpreadData || lastSpreadData.length === 0) {
+    // Validamos la nueva variable
+    if (!lastPersistenceData || lastPersistenceData.length === 0) {
         alert("Primero carga los datos con el botón 'Actualizar'");
         return;
     }
 
-    // UI State
     btn.disabled = true;
-    btn.innerHTML = `
-        <svg class="animate-spin h-4 w-4 text-white inline mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        Analizando...
-    `;
-    
+    btn.innerHTML = `⏳ Analizando persistencia...`;
     container.classList.remove('hidden');
-    textField.innerText = "La IA está examinando las tendencias actuales...";
+    textField.innerText = "La IA está examinando los temas más estables en el tiempo...";
 
     try {
-        const response = await fetch(`${API_BASE}/api/ai_summary`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                data: lastSpreadData,
-                pais_nombre: nombrePais
-            })
-        });
+        const [resSummary, resClass] = await Promise.all([
+            fetch(`${API_BASE}/api/ai_summary`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // ENVIAMOS PERSISTENCIA Y NOMBRE BONITO
+                body: JSON.stringify({ 
+                    data: lastPersistenceData, 
+                    pais_nombre: paisNombre 
+                })
+            }).then(r => r.json()),
+            fetch(`${API_BASE}/api/metrics/ai_classification${params}`).then(r => r.json())
+        ]);
 
-        const result = await response.json();
+        textField.innerText = resSummary.summary || "No se pudo generar el resumen.";
 
-        if (response.ok) {
-            textField.innerText = result.summary;
-        } else {
-            textField.innerText = "Error: " + (result.summary || result.error || "No se pudo generar");
+        if (resClass && !resClass.error) {
+            renderAiClassification(resClass);
         }
+
     } catch (error) {
-        console.error("Error en AI:", error);
-        textField.innerText = "Error de conexión con el servidor.";
+        console.error("Error en el motor de IA:", error);
+        textField.innerText = "Error de conexión con los servicios de IA.";
     } finally {
         btn.disabled = false;
         btn.innerText = "✨ Generar Análisis";
     }
 });
 
-// Función para inicializar la aplicación
+function renderAiClassification(data) {
+    const container = document.getElementById('topic-cards-container');
+    const canvas = document.getElementById('chart-ai-categories');
+    if (!container || !canvas) return;
+
+    container.innerHTML = ''; // Limpiar mensaje de espera
+    
+    // 1. Convertir el objeto en una lista y ORDENAR por cantidad de tendencias (descendente)
+    const sortedCategories = Object.entries(data)
+        .filter(([_, trends]) => trends.length > 0) // Solo categorías con datos
+        .sort((a, b) => b[1].length - a[1].length); // Ordenar: mayor a menor
+
+    const labels = [];
+    const counts = [];
+    // Paleta de colores consistente
+    const colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#94a3b8'];
+
+    // 2. Iterar sobre los datos YA ORDENADOS
+    sortedCategories.forEach(([category, trends], index) => {
+        labels.push(category);
+        counts.push(trends.length);
+
+        const currentColor = colors[index % colors.length];
+
+        // Crear Tarjeta con el color sincronizado
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-4 border-t-4";
+        card.style.borderTopColor = currentColor; // Sincronización con el gráfico
+        
+        card.innerHTML = `
+            <div class="flex justify-between items-start">
+                <span class="font-black text-xs uppercase tracking-widest text-slate-800">${category}</span>
+                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full" 
+                      style="background-color: ${currentColor}20; color: ${currentColor}">
+                    ${trends.length} temas
+                </span>
+            </div>
+            <div class="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                ${trends.map(t => `
+                    <span class="text-[12px] sm:text-[13px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold shadow-sm hover:bg-white transition-colors">
+                        ${t}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(card);
+    });
+
+    // 3. Dibujar Gráfico (ya recibirá las etiquetas y conteos ordenados)
+    if (chartInstances.aiCategories) chartInstances.aiCategories.destroy();
+    
+    chartInstances.aiCategories = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length), // Usar solo los colores necesarios
+                borderWidth: 0,
+                hoverOffset: 15
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    position: 'bottom', 
+                    labels: { 
+                        boxWidth: 12, 
+                        padding: 15,
+                        font: { size: 10, weight: 'bold', family: "'Montserrat', sans-serif",} 
+                    } 
+                }
+            },
+            cutout: '70%',
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            }
+        }
+    });
+}
+
 // Función para inicializar la aplicación
 async function initApp() {
     try {

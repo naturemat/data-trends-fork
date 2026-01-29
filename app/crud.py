@@ -2,7 +2,6 @@
 
 from typing import List, Dict, Any, Optional
 from app.models import Trend
-from modules.embeddings import embedding_manager
 
 # ---------------------------------------------------------------------
 # Create (Individual)
@@ -41,12 +40,6 @@ def save_scraped_trends(trends_data: List[Dict[str, Any]]) -> int:
 
     # Usamos la colección directamente desde la clase Trend
     result = Trend.collection.insert_many(documents)
-
-    # Enrich with topics and embeddings
-    for doc_id, doc in zip(result.inserted_ids, documents):
-        trend_text = doc["tendencia"]
-        # Add to FAISS (includes topic classification)
-        embedding_manager.add_trend(str(doc_id), trend_text)
 
     return len(result.inserted_ids)
 
