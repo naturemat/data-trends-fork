@@ -220,9 +220,7 @@ function drawSurvival(data) {
                         afterBody: function(context) {
                             const index = context[0].dataIndex;
                             const trends = data[index].topTrends || [];
-                            
                             if (trends.length === 0) return '';
-                            
                             let text = ['\nTop 3 temas:'];
                             trends.slice(0, 3).forEach((t, i) => {
                                 text.push(`${i + 1}. ${t}`);
@@ -234,13 +232,23 @@ function drawSurvival(data) {
             },
             scales: {
                 y: { 
-                    beginAtZero: true, 
-                    ticks: { precision: 0, font: {family: "'Montserrat', sans-serif", weight: '600' } },
+                    type: 'logarithmic',
+                    beginAtZero: false,
+                    min: 0.1,
+                    ticks: {
+                        callback: function(value) {
+                            // Esto limpia los ticks para que solo se vean números enteros (1, 10, 100, 1000...)
+                            if (value === 1 || value === 10 || value === 100 || value === 1000 || value === 5000) {
+                                return value;
+                            }
+                        },
+                        font: { family: "'Montserrat', sans-serif", weight: '600' }
+                    },
                     grid: { color: '#f1f5f9' }
                 },
                 x: { 
                     grid: { display: false },
-                    ticks: { font: {family: "'Montserrat', sans-serif", weight: '700' } }
+                    ticks: { font: { family: "'Montserrat', sans-serif", weight: '700' } }
                 }
             }
         }
