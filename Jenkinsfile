@@ -51,6 +51,7 @@ pipeline {
                         echo "FLASK_ENV=production" >> .env
                         echo "API_BASE_URL=http://3.151.181.99:5000" >> .env
                         echo "GROQCLOUD_API_KEY=***REMOVED***" >> .env
+                        echo "OPENAI_API_KEY=***REMOVED***" >> .env
                     """
 
                     sh """
