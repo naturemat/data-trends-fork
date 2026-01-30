@@ -192,7 +192,7 @@ function drawSurvival(data) {
     
     if (chartInstances.survival) chartInstances.survival.destroy();
 
-    const aiColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+    const aiColors = ['#BFDBFE', '#60A5FA', '#2563EB', '#1E3A8A'];
 
     chartInstances.survival = new Chart(ctx, {
         type: 'bar',
@@ -323,13 +323,15 @@ function drawSpreadTable(data) {
                     ${item.scope === 'global' ? 'Global' : item.scope === 'regional' ? 'Regional' : 'Local'}
                 </span>
             </td>
-            <td class="p-4 text-xl">
-                ${item.in_worldwide ? '✅' : '❌'}
+            <td class="p-4 text-xl text-center align-middle">
+                ${item.in_worldwide ? `<i data-lucide="check-circle"></i>`
+            : `<i data-lucide="x-circle"></i>`}
             </td>
             <td class="p-4 text-xs text-slate-500 font-medium">${translatedCountries.join(', ')}</td>
         `;
         container.appendChild(row);
     });
+    lucide.createIcons();
 }
 
 /**
