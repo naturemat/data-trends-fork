@@ -379,121 +379,57 @@ class Trend:
         }
     
     @classmethod
-    def aggregate_synchrony_radar(cls, pais, dt_from, dt_to):
-        pipeline = [
-            # 1. Filtrar rango y solo el país seleccionado + worldwide
-            {"$match": {
-                "scraped_at": {"$gte": dt_from, "$lte": dt_to},
-                "pais": {"$in": [pais, "worldwide"]}
-            }},
-            # 2. Agrupar por hora y país para tener la lista de tendencias
-            {
-                "$group": {
-                    "_id": {
-                        "hour": {"$hour": "$scraped_at"},
-                        "pais": "$pais"
-                    },
-                    "trends": {"$addToSet": "$tendencia"}
-                }
-            },
-            # 3. Re-agrupar solo por hora para tener ambos sets de tendencias juntos
-            {
-                "$group": {
-                    "_id": "$_id.hour",
-                    "sets": {
-                        "$push": {
-                            "p": "$_id.pais",
-                            "t": "$trends"
-                        }
-                    }
-                }
-            },
-            # 4. Calcular Intersección y Unión entre Worldwide y el País
-            {
-                "$project": {
-                    "hour": "$_id",
-                    "worldwide_set": {
-                        "$filter": {"input": "$sets", "as": "s", "cond": {"$eq": ["$$s.p", "worldwide"]}}
-                    },
-                    "local_set": {
-                        "$filter": {"input": "$sets", "as": "s", "cond": {"$eq": ["$$s.p", pais]}}
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "hour": 1,
-                    "intersection": {"$size": {"$setIntersection": [
-                        {"$arrayElemAt": ["$worldwide_set.t", 0]},
-                        {"$arrayElemAt": ["$local_set.t", 0]}
-                    ]}},
-                    "union": {"$size": {"$setUnion": [
-                        {"$arrayElemAt": ["$worldwide_set.t", 0]},
-                        {"$arrayElemAt": ["$local_set.t", 0]}
-                    ]}}
-                }
-            },
-            # 5. Calcular porcentaje final de sincronía
-            {
-                "$project": {
-                    "hour": 1,
-                    "sync_index": {
-                        "$cond": [
-                            {"$gt": ["$union", 0]},
-                            {"$multiply": [{"$divide": ["$intersection", "$union"]}, 100]},
-                            0
-                        ]
-                    }
-                }
-            },
-            {"$sort": {"hour": 1}}
-        ]
-        return list(cls.collection.aggregate(pipeline))
-    
-    @classmethod
     def aggregate_survival_stats(cls, pais, dt_from, dt_to, granularity="hour"):
-        if granularity == "hour":
+        # Decidimos los puntos de corte (bins) basados siempre en HORAS
+        # pero ajustados a los labels que el usuario espera ver.
+        
+        diff_days = (dt_to - dt_from).days
+        
+        if diff_days <= 2:
+            # Escala de corto plazo: 0h, 3h, 9h, 24h
             bins = [0, 3, 9, 24]
             labels = ["Fugaz (<3h)", "Activa (3-8h)", "Persistente (9-23h)", "Inmortal (>=24h)"]
         else:
-            bins = [0, 1, 3, 7]
+            # Escala de largo plazo: convertimos los días de tus labels a horas
+            # Efímera: < 24h
+            # Estable: 24h a 71h (1-2 días)
+            # Semanal: 72h a 167h (3-6 días)
+            # Histórica: >= 168h (7+ días)
+            bins = [0, 24, 72, 168]
             labels = ["Efímera (<1d)", "Estable (1-2d)", "Semanal (3-6d)", "Histórica (>=7d)"]
 
         pipeline = [
             {"$match": {"scraped_at": {"$gte": dt_from, "$lte": dt_to}, "pais": pais}},
             {
-                "$addFields": {
-                    "time_unit": {
-                        "$dateTrunc": {
-                            "date": "$scraped_at",
-                            "unit": granularity,
-                            "timezone": "-05:00"
+                "$group": {
+                    "_id": {"$trim": {"input": "$tendencia"}},
+                    # USAMOS SIEMPRE "hour" para la métrica interna de supervivencia
+                    "horas_vivas": {
+                        "$addToSet": {
+                            "$dateTrunc": {
+                                "date": "$scraped_at",
+                                "unit": "hour",
+                                "timezone": "-05:00"
+                            }
                         }
                     }
                 }
             },
             {
-                "$group": {
-                    "_id": {"$trim": {"input": "$tendencia"}},
-                    "duration": {"$addToSet": "$time_unit"}
-                }
-            },
-            {
                 "$project": {
-                    "trend_name": "$_id", # Guardamos el nombre
-                    "total_units": {"$size": "$duration"}
+                    "trend_name": "$_id",
+                    "total_hours": {"$size": "$horas_vivas"} 
                 }
             },
-            # --- PASO CLAVE: Ordenar por duración descendente ---
-            {"$sort": {"total_units": -1}}, 
+            {"$sort": {"total_hours": -1}}, 
             {
                 "$bucket": {
-                    "groupBy": "$total_units",
+                    "groupBy": "$total_hours",
                     "boundaries": bins,
                     "default": "Superior",
                     "output": { 
                         "count": { "$sum": 1 },
-                        "trends": { "$push": "$trend_name" } # El $push mantendrá el orden del $sort
+                        "trends": { "$push": "$trend_name" }
                     }
                 }
             }
@@ -501,14 +437,7 @@ class Trend:
         
         raw_data = list(cls.collection.aggregate(pipeline))
         
-        # Usamos los límites como llaves para mapear fácil
-        conteo_final = {b: 0 for b in bins}
-        conteo_final["Superior"] = 0
-
-        for item in raw_data:
-            conteo_final[item["_id"]] = item["count"]
-
-        # Formatear para el frontend
+        # Formateo final (idéntico al anterior)
         formatted = []
         for i, b in enumerate(bins):
             label = labels[i]
@@ -525,7 +454,7 @@ class Trend:
             formatted.append({
                 "label": label,
                 "count": count,
-                "topTrends": trends[:3] # Enviamos solo las primeras 3 para el tooltip
+                "topTrends": trends[:3]
             })
         
         return formatted
