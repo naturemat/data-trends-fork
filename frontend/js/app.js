@@ -35,6 +35,28 @@ const countryTranslations = {
     "australia": "Australia"
 };
 
+const countryISOMap = {
+    "ecuador": "ec",
+    "united-states": "us",
+    "united-kingdom": "gb",
+    "spain": "es",
+    "argentina": "ar",
+    "brazil": "br",
+    "canada": "ca",
+    "colombia": "co",
+    "mexico": "mx",
+    "peru": "pe",
+    "france": "fr",
+    "germany": "de",
+    "india": "in",
+    "japan": "jp",
+    "netherlands": "nl",
+    "russia": "ru",
+    "sweden": "se",
+    "switzerland": "ch",
+    "australia": "au"
+};
+
 // Asegurar coherencia visual en los calendarios
 const inputFrom = document.getElementById('filter-date-from');
 const inputTo = document.getElementById('filter-date-to');
@@ -367,6 +389,14 @@ async function refreshData() {
 const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
+        const heroContainer = document.getElementById('hero-trends');
+        if (heroContainer) {
+            heroContainer.innerHTML = `
+                <span class="text-slate-400 italic">
+                    Actualizando tendencias...
+                </span>`;
+        }
+
         const [act, per, spr, lastUpd, summary, surv] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/persistence${params}`).then(r => r.json()),
@@ -378,6 +408,7 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
 
         lastPersistenceData = per.data || [];
 
+        renderTrendingHero(lastPersistenceData, pais)
         drawActivity(act.data || [], granularity);
         drawPersistence(per.data || []);
         drawSpreadTable(spr.data || []);
@@ -394,10 +425,15 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
         const globales = summary.total_global || 0;
         const pct = total > 0 ? ((globales / total) * 100).toFixed(1) : 0;
 
-        document.getElementById('stat-total').innerText = total;
-        document.getElementById('stat-paises').innerText = summary.total_paises || 1;
-        document.getElementById('stat-globales').innerText = globales;
-        document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
+        const statTotal = document.getElementById('stat-total');
+        const statPaises = document.getElementById('stat-paises');
+        const statGlobales = document.getElementById('stat-globales');
+        const statGlobalesPct = document.getElementById('stat-globales-pct');
+
+        if (statTotal) statTotal.innerText = total;
+        if (statPaises) statPaises.innerText = summary.total_paises || 1;
+        if (statGlobales) statGlobales.innerText = globales;
+        if (statGlobalesPct) statGlobalesPct.innerText = `(${pct}%)`;
         
         // Limpiar la sección de IA al actualizar filtros
         const topicContainer = document.getElementById('topic-cards-container');
@@ -444,6 +480,8 @@ document.getElementById('btn-update').addEventListener('click', refreshData);
 // Resumen Inteligente
 document.getElementById('btn-ai').addEventListener('click', async () => {
     const btn = document.getElementById('btn-ai');
+    const btnText = document.getElementById('btn-ai-text');
+    const btnIcon = document.getElementById('btn-ai-icon');
     const container = document.getElementById('ai-response-container');
     const textField = document.getElementById('ai-text');
     const paisCodigo = document.getElementById('filter-pais').value;
@@ -461,7 +499,9 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     }
 
     btn.disabled = true;
-    btn.innerHTML = `⏳ Analizando persistencia...`;
+    btnText.textContent = "Analizando persistencia...";
+    document.getElementById("icon-cpu").classList.add("hidden");
+    document.getElementById("icon-loader").classList.remove("hidden");
     container.classList.remove('hidden');
     textField.innerText = "La IA está examinando los temas más estables en el tiempo...";
 
@@ -490,7 +530,9 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
         textField.innerText = "Error de conexión con los servicios de IA.";
     } finally {
         btn.disabled = false;
-        btn.innerText = "✨ Generar Análisis";
+        btnText.textContent = "Generar Análisis con IA";
+        document.getElementById("icon-loader").classList.add("hidden");
+        document.getElementById("icon-cpu").classList.remove("hidden");
     }
 });
 
@@ -595,6 +637,52 @@ async function initApp() {
         API_BASE = window.location.origin; 
         refreshData();
     }
+}
+
+function renderTrendingHero(data, paisCodigo) {
+    const container = document.getElementById('hero-trends');
+    const countryLabel = document.getElementById('hero-country');
+    const flagImg = document.getElementById('hero-flag');
+    const globeIcon = document.getElementById('hero-globe');
+    const isoCode = countryISOMap[paisCodigo];
+
+    if (!container || !data || data.length === 0) return;
+
+    countryLabel.textContent = countryTranslations[paisCodigo] || paisCodigo;
+
+    flagImg.classList.add("opacity-0");
+
+    flagImg.classList.add('hidden');
+    globeIcon.classList.add('hidden');
+
+    if (paisCodigo === 'worldwide') {
+        globeIcon.classList.remove('hidden');
+        lucide.createIcons(); // importante
+    } else {
+        const isoCode = countryISOMap[paisCodigo];
+        if (isoCode) {
+            flagImg.src = `https://flagcdn.com/w80/${isoCode.toLowerCase()}.png`;
+            flagImg.classList.remove('hidden');
+        }
+    }
+
+    flagImg.onload = () => {
+        flagImg.classList.remove("opacity-0");
+    };
+
+    flagImg.classList.remove("hidden");
+
+    container.innerHTML = '';
+
+    data.slice(0, 15).forEach(item => {
+        const chip = document.createElement('span');
+        chip.className =
+            "px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-bold text-sm " +
+            "border border-blue-100 hover:bg-blue-100 transition";
+
+        chip.textContent = item.trend;
+        container.appendChild(chip);
+    });
 }
 
 window.addEventListener('load', initApp);

@@ -112,8 +112,32 @@
         <main class="p-8 max-w-7xl mx-auto w-full space-y-10">
 
             <section id="sec-dashboard" class="content-section space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="stat-card card-green">
+                                <!-- HERO: Trending Now -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-800 tracking-tight">
+                                Tendencias Actuales
+                            </h2>
+                            <p class="text-sm text-slate-500">
+                                Principales temas detectados en
+                                <span id="hero-country" class="font-bold text-blue-600">---</span>
+                            </p>
+                        </div>
+                        <i id="hero-globe" data-lucide="globe-2" class="w-8 h-8 text-blue-600 hidden"></i>
+                        <img id="hero-flag"
+                            class="w-24 h-18 object-cover rounded-sm hidden"
+                            loading="lazy"
+                            alt="Bandera del país">
+                    </div>
+
+                    <div id="hero-trends"
+                        class="flex flex-wrap gap-3">
+                        <!-- Chips dinámicos -->
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 place-items-center">
+                    <div class="stat-card card-green max-w-sm w-full">
                         <div class="card-icon">
                             <i data-lucide="trending-up"></i></div>
                         <div class="card-content">
@@ -123,17 +147,7 @@
                         <div class="card-glow"></div>
                     </div>
 
-                    <div class="stat-card card-blue">
-                        <div class="card-icon">
-                            <i data-lucide="map-pin"></i></div>
-                        <div class="card-content">
-                            <h3 id="stat-paises">20</h3>
-                            <p>Países Analizados</p>
-                        </div>
-                        <div class="card-glow"></div>
-                    </div>
-
-                    <div class="stat-card card-purple">
+                    <div class="stat-card card-purple max-w-sm w-full">
                         <div class="card-icon">
                             <i data-lucide="globe-2"></i></div>
                         <div class="card-content">
@@ -226,9 +240,11 @@
                             <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Análisis Predictivo e Inteligente</h2>
                             <p class="text-sm text-slate-500">Clasificación por IA y Narrativa de Contexto</p>
                         </div>
-                        <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
-                            <i data-lucide="cpu" class="w-4 h-4"></i>
-                            Generar Análisis con IA
+                        <button id="btn-ai"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
+                                <i id="icon-cpu" data-lucide="cpu" class="w-4 h-4"></i>
+                                <i id="icon-loader" data-lucide="loader-2" class="w-4 h-4 hidden animate-spin"></i>
+                            <span id="btn-ai-text">Generar Análisis con IA</span>
                         </button>
                     </div>
 
