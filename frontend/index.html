@@ -130,10 +130,11 @@
                             loading="lazy"
                             alt="Bandera del país">
                     </div>
-
-                    <div id="hero-trends"
-                        class="flex flex-wrap gap-3">
-                        <!-- Chips dinámicos -->
+                    <div class="relative w-full h-[320px] md:h-[380px]">
+                        <canvas
+                            id="hero-wordcloud"
+                            class="w-full h-full">
+                        </canvas>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 place-items-center">
@@ -442,6 +443,8 @@
 
         </main>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
 
     <script>
         function showSection(sectionId, element) {

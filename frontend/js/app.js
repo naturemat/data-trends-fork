@@ -408,7 +408,8 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
 
         lastPersistenceData = per.data || [];
 
-        renderTrendingHero(lastPersistenceData, pais)
+        renderTrendingHero(lastPersistenceData, pais);
+        renderHeroWordCloud(lastPersistenceData);
         drawActivity(act.data || [], granularity);
         drawPersistence(per.data || []);
         drawSpreadTable(spr.data || []);
@@ -640,49 +641,72 @@ async function initApp() {
 }
 
 function renderTrendingHero(data, paisCodigo) {
-    const container = document.getElementById('hero-trends');
     const countryLabel = document.getElementById('hero-country');
     const flagImg = document.getElementById('hero-flag');
     const globeIcon = document.getElementById('hero-globe');
     const isoCode = countryISOMap[paisCodigo];
 
-    if (!container || !data || data.length === 0) return;
+    // Validación mínima (SIN container)
+    if (!countryLabel) return;
 
     countryLabel.textContent = countryTranslations[paisCodigo] || paisCodigo;
 
-    flagImg.classList.add("opacity-0");
-
-    flagImg.classList.add('hidden');
+    // Reset visual
+    flagImg.classList.add('hidden', 'opacity-0');
     globeIcon.classList.add('hidden');
 
+    // Caso GLOBAL
     if (paisCodigo === 'worldwide') {
         globeIcon.classList.remove('hidden');
-        lucide.createIcons(); // importante
-    } else {
-        const isoCode = countryISOMap[paisCodigo];
-        if (isoCode) {
-            flagImg.src = `https://flagcdn.com/w80/${isoCode.toLowerCase()}.png`;
-            flagImg.classList.remove('hidden');
-        }
+        lucide.createIcons();
+        return; // ⬅️ CLAVE
     }
 
+    // Caso PAÍS
+    if (!isoCode) return;
+
+    flagImg.src = `https://flagcdn.com/w80/${isoCode}.png`;
+    flagImg.classList.remove('hidden');
+
     flagImg.onload = () => {
-        flagImg.classList.remove("opacity-0");
+        flagImg.classList.remove('opacity-0');
     };
+}
 
-    flagImg.classList.remove("hidden");
+function renderHeroWordCloud(data) {
+  const canvas = document.getElementById("hero-wordcloud");
+  if (!canvas || !data || data.length === 0) return;
 
-    container.innerHTML = '';
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
 
-    data.slice(0, 15).forEach(item => {
-        const chip = document.createElement('span');
-        chip.className =
-            "px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-bold text-sm " +
-            "border border-blue-100 hover:bg-blue-100 transition";
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
 
-        chip.textContent = item.trend;
-        container.appendChild(chip);
-    });
+  const list = data.map(item => [
+    item.trend,
+    item.persistence || item.weight || 10
+  ]);
+
+  WordCloud(canvas, {
+    list,
+    weightFactor: (w) => (Math.log(w + 1) * 18) * dpr, 
+    gridSize: 10 * dpr,
+    fontFamily: 'Montserrat, sans-serif',
+    backgroundColor: 'transparent',
+    color: () => {
+      const colors = [
+        '#3B82F6', // azul base (mínimo permitido)
+        '#2563EB', // azul intenso
+        '#1D4ED8', // azul profundo
+        '#1E3A8A'  // azul marino
+        ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    },
+    rotateRatio: 0.2,
+    drawOutOfBound: false,
+    shrinkToFit: true
+  });
 }
 
 window.addEventListener('load', initApp);
