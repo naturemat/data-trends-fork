@@ -673,40 +673,58 @@ function renderTrendingHero(data, paisCodigo) {
     };
 }
 
+let wordCloudData = null;
+
 function renderHeroWordCloud(data) {
-  const canvas = document.getElementById("hero-wordcloud");
-  if (!canvas || !data || data.length === 0) return;
+    wordCloudData = data;
 
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
+    const canvas = document.getElementById("hero-wordcloud");
+    if (!canvas || !data || data.length === 0) return;
 
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+    const parent = canvas.parentElement;
+    const rect = parent.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
 
-  const list = data.map(item => [
-    item.trend,
-    item.persistence || item.weight || 10
-  ]);
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
 
-  WordCloud(canvas, {
-    list,
-    weightFactor: (w) => (Math.log(w + 1) * 18) * dpr, 
-    gridSize: 10 * dpr,
-    fontFamily: 'Montserrat, sans-serif',
-    backgroundColor: 'transparent',
-    color: () => {
-      const colors = [
-        '#3B82F6', // azul base (mínimo permitido)
-        '#2563EB', // azul intenso
-        '#1D4ED8', // azul profundo
-        '#1E3A8A'  // azul marino
-        ];
-      return colors[Math.floor(Math.random() * colors.length)];
-    },
-    rotateRatio: 0.2,
-    drawOutOfBound: false,
-    shrinkToFit: true
-  });
+    const list = data.map(item => [
+        item.trend,
+        Math.max(1, item.persistence || item.weight || 1)
+    ]);
+
+    WordCloud(canvas, {
+        list,
+        gridSize: window.innerWidth < 640 ? 8 : 10,
+        weightFactor: w =>
+            window.innerWidth < 640
+                ? Math.sqrt(w) * 18
+                : Math.sqrt(w) * 28,
+        fontFamily: 'Montserrat, sans-serif',
+        backgroundColor: 'transparent',
+        color: () => {
+            const colors = ['#1E3A8A', '#2563EB', '#4F46E5', '#4338CA'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        },
+        rotateRatio: window.innerWidth < 640 ? 0 : 0.1,
+        drawOutOfBound: false,
+        shrinkToFit: true
+    });
+}
+
+window.addEventListener("resize", () => {
+    if (wordCloudData) {
+        renderHeroWordCloud(wordCloudData);
+    }
+});
+
+const sidebar = document.getElementById("sidebar");
+const btnMobileMenu = document.getElementById("btn-mobile-menu");
+
+if (btnMobileMenu) {
+    btnMobileMenu.addEventListener("click", () => {
+        sidebar.classList.toggle("hidden");
+    });
 }
 
 window.addEventListener('load', initApp);
