@@ -355,3 +355,13 @@ header input {
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
 }
+
+.sidebar.w-20 .nav-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.sidebar.w-20 .nav-link .icon {
+    margin-right: 0;
+}

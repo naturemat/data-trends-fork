@@ -35,6 +35,28 @@ const countryTranslations = {
     "australia": "Australia"
 };
 
+const countryISOMap = {
+    "ecuador": "ec",
+    "united-states": "us",
+    "united-kingdom": "gb",
+    "spain": "es",
+    "argentina": "ar",
+    "brazil": "br",
+    "canada": "ca",
+    "colombia": "co",
+    "mexico": "mx",
+    "peru": "pe",
+    "france": "fr",
+    "germany": "de",
+    "india": "in",
+    "japan": "jp",
+    "netherlands": "nl",
+    "russia": "ru",
+    "sweden": "se",
+    "switzerland": "ch",
+    "australia": "au"
+};
+
 // Asegurar coherencia visual en los calendarios
 const inputFrom = document.getElementById('filter-date-from');
 const inputTo = document.getElementById('filter-date-to');
@@ -367,6 +389,14 @@ async function refreshData() {
 const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granularity=${granularity}&limit=50`;
 
     try {
+        const heroContainer = document.getElementById('hero-trends');
+        if (heroContainer) {
+            heroContainer.innerHTML = `
+                <span class="text-slate-400 italic">
+                    Actualizando tendencias...
+                </span>`;
+        }
+
         const [act, per, spr, lastUpd, summary, surv] = await Promise.all([
             fetch(`${API_BASE}/api/metrics/activity${params}`).then(r => r.json()),
             fetch(`${API_BASE}/api/metrics/persistence${params}`).then(r => r.json()),
@@ -378,6 +408,8 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
 
         lastPersistenceData = per.data || [];
 
+        renderTrendingHero(lastPersistenceData, pais);
+        renderHeroWordCloud(lastPersistenceData);
         drawActivity(act.data || [], granularity);
         drawPersistence(per.data || []);
         drawSpreadTable(spr.data || []);
@@ -394,10 +426,15 @@ const params = `?pais=${pais}&date_from=${range.from}&date_to=${range.to}&granul
         const globales = summary.total_global || 0;
         const pct = total > 0 ? ((globales / total) * 100).toFixed(1) : 0;
 
-        document.getElementById('stat-total').innerText = total;
-        document.getElementById('stat-paises').innerText = summary.total_paises || 1;
-        document.getElementById('stat-globales').innerText = globales;
-        document.getElementById('stat-globales-pct').innerText = `(${pct}%)`;
+        const statTotal = document.getElementById('stat-total');
+        const statPaises = document.getElementById('stat-paises');
+        const statGlobales = document.getElementById('stat-globales');
+        const statGlobalesPct = document.getElementById('stat-globales-pct');
+
+        if (statTotal) statTotal.innerText = total;
+        if (statPaises) statPaises.innerText = summary.total_paises || 1;
+        if (statGlobales) statGlobales.innerText = globales;
+        if (statGlobalesPct) statGlobalesPct.innerText = `(${pct}%)`;
         
         // Limpiar la sección de IA al actualizar filtros
         const topicContainer = document.getElementById('topic-cards-container');
@@ -444,6 +481,8 @@ document.getElementById('btn-update').addEventListener('click', refreshData);
 // Resumen Inteligente
 document.getElementById('btn-ai').addEventListener('click', async () => {
     const btn = document.getElementById('btn-ai');
+    const btnText = document.getElementById('btn-ai-text');
+    const btnIcon = document.getElementById('btn-ai-icon');
     const container = document.getElementById('ai-response-container');
     const textField = document.getElementById('ai-text');
     const paisCodigo = document.getElementById('filter-pais').value;
@@ -461,7 +500,9 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
     }
 
     btn.disabled = true;
-    btn.innerHTML = `⏳ Analizando persistencia...`;
+    btnText.textContent = "Analizando persistencia...";
+    document.getElementById("icon-cpu").classList.add("hidden");
+    document.getElementById("icon-loader").classList.remove("hidden");
     container.classList.remove('hidden');
     textField.innerText = "La IA está examinando los temas más estables en el tiempo...";
 
@@ -490,7 +531,9 @@ document.getElementById('btn-ai').addEventListener('click', async () => {
         textField.innerText = "Error de conexión con los servicios de IA.";
     } finally {
         btn.disabled = false;
-        btn.innerText = "✨ Generar Análisis";
+        btnText.textContent = "Generar Análisis con IA";
+        document.getElementById("icon-loader").classList.add("hidden");
+        document.getElementById("icon-cpu").classList.remove("hidden");
     }
 });
 
@@ -595,6 +638,93 @@ async function initApp() {
         API_BASE = window.location.origin; 
         refreshData();
     }
+}
+
+function renderTrendingHero(data, paisCodigo) {
+    const countryLabel = document.getElementById('hero-country');
+    const flagImg = document.getElementById('hero-flag');
+    const globeIcon = document.getElementById('hero-globe');
+    const isoCode = countryISOMap[paisCodigo];
+
+    // Validación mínima (SIN container)
+    if (!countryLabel) return;
+
+    countryLabel.textContent = countryTranslations[paisCodigo] || paisCodigo;
+
+    // Reset visual
+    flagImg.classList.add('hidden', 'opacity-0');
+    globeIcon.classList.add('hidden');
+
+    // Caso GLOBAL
+    if (paisCodigo === 'worldwide') {
+        globeIcon.classList.remove('hidden');
+        lucide.createIcons();
+        return; // ⬅️ CLAVE
+    }
+
+    // Caso PAÍS
+    if (!isoCode) return;
+
+    flagImg.src = `https://flagcdn.com/w80/${isoCode}.png`;
+    flagImg.classList.remove('hidden');
+
+    flagImg.onload = () => {
+        flagImg.classList.remove('opacity-0');
+    };
+}
+
+let wordCloudData = null;
+
+function renderHeroWordCloud(data) {
+    wordCloudData = data;
+
+    const canvas = document.getElementById("hero-wordcloud");
+    if (!canvas || !data || data.length === 0) return;
+
+    const parent = canvas.parentElement;
+    const rect = parent.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
+    const list = data.map(item => [
+        item.trend,
+        Math.max(1, item.persistence || item.weight || 1)
+    ]);
+
+    WordCloud(canvas, {
+        list,
+        gridSize: window.innerWidth < 640 ? 8 : 10,
+        weightFactor: w =>
+            window.innerWidth < 640
+                ? Math.sqrt(w) * 18
+                : Math.sqrt(w) * 28,
+        fontFamily: 'Montserrat, sans-serif',
+        backgroundColor: 'transparent',
+        color: () => {
+            const colors = ['#1E3A8A', '#2563EB', '#4F46E5', '#4338CA'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        },
+        rotateRatio: window.innerWidth < 640 ? 0 : 0.1,
+        drawOutOfBound: false,
+        shrinkToFit: true
+    });
+}
+
+window.addEventListener("resize", () => {
+    if (wordCloudData) {
+        renderHeroWordCloud(wordCloudData);
+    }
+});
+
+const sidebar = document.getElementById("sidebar");
+const btnMobileMenu = document.getElementById("btn-mobile-menu");
+
+if (btnMobileMenu) {
+    btnMobileMenu.addEventListener("click", () => {
+        sidebar.classList.toggle("hidden");
+    });
 }
 
 window.addEventListener('load', initApp);

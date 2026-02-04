@@ -26,11 +26,16 @@
 </head>
 <body class="bg-slate-50 text-slate-800 flex h-screen overflow-hidden">
 
-    <aside class="sidebar w-64 bg-white border-r border-slate-200 flex flex-col z-20">
+    <aside id="sidebar" class="sidebar w-64 transition-all duration-300 bg-white border-r border-slate-200 flex flex-col z-20 relative">
         <div class="p-6 flex items-center gap-3">
-            <img src="/assets/logo.png" alt="Logo" class="h-10 w-auto">
+            <img src="/assets/logo.png" alt="Logo" class="h-10 w-10 shrink-0 object-contain">
             <span class="text-xl font-black tracking-tight text-blue-600">DataTrendX</span>
         </div>
+
+        <button id="toggle-sidebar"
+                class="absolute -right-3 top-6 bg-white border border-slate-200 rounded-full p-2 shadow-sm hover:bg-slate-100 transition">
+            <i id="toggle-icon" data-lucide="chevron-left" class="w-4 h-4 text-slate-600 transition-transform"></i>
+        </button>
 
         <nav class="flex-1 px-4 space-y-2">
             <a href="#" class="nav-link active" onclick="showSection('dashboard', this)">
@@ -39,19 +44,19 @@
             </a>
             <a href="#" class="nav-link" onclick="showSection('alcance', this)">
                 <i data-lucide="globe-2" class="icon"></i>
-                <span>Alcance de Tendencias</span>
+                <span class="nav-text">Alcance de Tendencias</span>
             </a>
             <a href="#" class="nav-link" onclick="showSection('ia', this)">
                 <i data-lucide="cpu" class="icon"></i>
-                <span>Análisis IA</span>
+                <span class="nav-text">Análisis IA</span>
             </a>
             <a href="#" class="nav-link" onclick="showSection('acerca', this)">
                 <i data-lucide="info" class="icon"></i>
-                <span>Acerca de</span>
+                <span class="nav-text">Acerca de</span>
             </a>
             <a href="#" class="nav-link" onclick="showSection('ayuda', this)">
                 <i data-lucide="help-circle" class="icon"></i>
-                <span>Ayuda</span>
+                <span class="nav-text">Ayuda</span>
             </a>
         </nav>
     </aside>
@@ -112,8 +117,34 @@
         <main class="p-8 max-w-7xl mx-auto w-full space-y-10">
 
             <section id="sec-dashboard" class="content-section space-y-8">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="stat-card card-green">
+                                <!-- HERO: Trending Now -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-800 tracking-tight">
+                                Tendencias Actuales
+                            </h2>
+                            <p class="text-sm text-slate-500">
+                                Principales temas detectados en
+                                <span id="hero-country" class="font-bold text-blue-600">---</span>
+                            </p>
+                        </div>
+                        <i id="hero-globe" data-lucide="globe-2" class="w-8 h-8 text-blue-600 hidden"></i>
+                        <img id="hero-flag"
+                            class="w-24 h-18 object-cover rounded-sm hidden"
+                            loading="lazy"
+                            alt="Bandera del país">
+                    </div>
+
+                    <div class="relative w-full 
+                                h-[240px] 
+                                sm:h-[280px] 
+                                md:h-[320px]">
+                        <canvas id="hero-wordcloud" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 place-items-center">
+                    <div class="stat-card card-green max-w-sm w-full">
                         <div class="card-icon">
                             <i data-lucide="trending-up"></i></div>
                         <div class="card-content">
@@ -123,17 +154,7 @@
                         <div class="card-glow"></div>
                     </div>
 
-                    <div class="stat-card card-blue">
-                        <div class="card-icon">
-                            <i data-lucide="map-pin"></i></div>
-                        <div class="card-content">
-                            <h3 id="stat-paises">20</h3>
-                            <p>Países Analizados</p>
-                        </div>
-                        <div class="card-glow"></div>
-                    </div>
-
-                    <div class="stat-card card-purple">
+                    <div class="stat-card card-purple max-w-sm w-full">
                         <div class="card-icon">
                             <i data-lucide="globe-2"></i></div>
                         <div class="card-content">
@@ -226,9 +247,11 @@
                             <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Análisis Predictivo e Inteligente</h2>
                             <p class="text-sm text-slate-500">Clasificación por IA y Narrativa de Contexto</p>
                         </div>
-                        <button id="btn-ai" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
-                            <i data-lucide="cpu" class="w-4 h-4"></i>
-                            Generar Análisis con IA
+                        <button id="btn-ai"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black text-xs uppercase transition-all flex items-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">
+                                <i id="icon-cpu" data-lucide="cpu" class="w-4 h-4"></i>
+                                <i id="icon-loader" data-lucide="loader-2" class="w-4 h-4 hidden animate-spin"></i>
+                            <span id="btn-ai-text">Generar Análisis con IA</span>
                         </button>
                     </div>
 
@@ -443,7 +466,39 @@
         }
     </script>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggle-sidebar');
+            const toggleIcon = document.getElementById('toggle-icon');
+            const navTexts = document.querySelectorAll('.nav-text');
+
+            let collapsed = false;
+
+            toggleBtn.addEventListener('click', () => {
+                collapsed = !collapsed;
+
+                if (collapsed) {
+                    sidebar.classList.remove('w-64');
+                    sidebar.classList.add('w-20');
+
+                    navTexts.forEach(t => t.classList.add('hidden'));
+
+                    toggleIcon.classList.add('rotate-180');
+                } else {
+                    sidebar.classList.remove('w-20');
+                    sidebar.classList.add('w-64');
+
+                    navTexts.forEach(t => t.classList.remove('hidden'));
+
+                    toggleIcon.classList.remove('rotate-180');
+                }
+            });
+        });
+        </script>
+
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
 
     <script>
         lucide.createIcons();
