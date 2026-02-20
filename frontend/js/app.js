@@ -643,6 +643,7 @@ async function initApp() {
 function renderTrendingHero(data, paisCodigo) {
     const countryLabel = document.getElementById('hero-country');
     const flagImg = document.getElementById('hero-flag');
+    const flagContainer = document.getElementById('flag-container');
     const globeIcon = document.getElementById('hero-globe');
     const isoCode = countryISOMap[paisCodigo];
 
@@ -652,7 +653,8 @@ function renderTrendingHero(data, paisCodigo) {
     countryLabel.textContent = countryTranslations[paisCodigo] || paisCodigo;
 
     // Reset visual
-    flagImg.classList.add('hidden', 'opacity-0');
+    if (flagImg) flagImg.classList.add('hidden', 'opacity-0');
+    if (flagContainer) flagContainer.classList.add('hidden');
     globeIcon.classList.add('hidden');
 
     // Caso GLOBAL
@@ -665,6 +667,9 @@ function renderTrendingHero(data, paisCodigo) {
     // Caso PAÍS
     if (!isoCode) return;
 
+    if (flagContainer) {
+        flagContainer.classList.remove('hidden');
+    }
     flagImg.src = `https://flagcdn.com/w80/${isoCode}.png`;
     flagImg.classList.remove('hidden');
 
@@ -679,34 +684,60 @@ function renderHeroWordCloud(data) {
     wordCloudData = data;
 
     const canvas = document.getElementById("hero-wordcloud");
-    if (!canvas || !data || data.length === 0) return;
+    
+    // Verificar que existan datos
+    if (!canvas || !data || !Array.isArray(data) || data.length === 0) {
+        console.log('WordCloud: No hay datos disponibles');
+        return;
+    }
 
     const parent = canvas.parentElement;
     const rect = parent.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
+    const containerWidth = rect.width;
+    
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
 
-    const list = data.map(item => [
-        item.trend,
-        Math.max(1, item.persistence || item.weight || 1)
-    ]);
+    // Normalizar los valores para que la diferencia sea más notable
+    // Usamos 'appearances' que es la frecuencia real de cada tendencia
+    const weights = data.map(item => item.appearances || item.persistence || item.weight || 1);
+    const maxWeight = Math.max(...weights);
+    const minWeight = Math.min(...weights);
+    
+    const list = data.map(item => {
+        const weight = item.appearances || item.persistence || item.weight || 1;
+        // Normalizar a una escala de 1-100 para mejor diferenciación
+        const normalizedWeight = maxWeight > minWeight 
+            ? ((weight - minWeight) / (maxWeight - minWeight)) * 99 + 1
+            : 50;
+        return [item.trend, normalizedWeight];
+    });
+
+    // Calcular factor de peso basado en el ancho real del contenedor
+    const baseSize = containerWidth < 400 ? 12 : (containerWidth < 640 ? 16 : 20);
+    const maxFontSize = containerWidth < 400 ? 36 : (containerWidth < 640 ? 48 : 60);
+    
+    // Función simple de scaling - evitar recursion infinita
+    const weightFactor = function(w) {
+        // Escala lineal simple con un mínimo y máximo
+        const normalized = w / 100;
+        const size = baseSize + (normalized * (maxFontSize - baseSize));
+        return Math.round(size);
+    };
 
     WordCloud(canvas, {
         list,
-        gridSize: window.innerWidth < 640 ? 8 : 10,
-        weightFactor: w =>
-            window.innerWidth < 640
-                ? Math.sqrt(w) * 18
-                : Math.sqrt(w) * 28,
+        gridSize: containerWidth < 400 ? 6 : (containerWidth < 640 ? 8 : 10),
+        weightFactor,
         fontFamily: 'Montserrat, sans-serif',
         backgroundColor: 'transparent',
         color: () => {
-            const colors = ['#1E3A8A', '#2563EB', '#4F46E5', '#4338CA'];
+            const colors = ['#1E3A8A', '#2563EB', '#4F46E5', '#4338CA', '#1D4ED8', '#3B82F6'];
             return colors[Math.floor(Math.random() * colors.length)];
         },
-        rotateRatio: window.innerWidth < 640 ? 0 : 0.1,
+        rotateRatio: containerWidth < 640 ? 0 : 0.15,
         drawOutOfBound: false,
         shrinkToFit: true
     });
