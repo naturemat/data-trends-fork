@@ -1,22 +1,66 @@
 """MongoDB document models."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 from app.db import db
+
+# Zona horaria de referencia del proyecto (Ecuador, UTC-5).
+#
+# El dato crudo se guarda siempre en UTC, que es como Mongo lo interpreta.
+# Los cortes por dia y por hora se hacen en esta zona para que el dashboard
+# trama "el dialocal" y no el dia de UTC, y routes.py convierte a UTC con el
+# mismo desplazamiento. Antes estos dos valores estaban escritos a mano en
+# tres archivos distintos, por lo que cualquier cambio podia descuadrarlos.
+DISPLAY_TZ = "-05:00"
+DISPLAY_TZ_OFFSET = timedelta(hours=5)
+# Para convertir a esa zona en Python hace falta un timedelta, no el string
+# que usa Mongo en $dateTrunc.
+DISPLAY_TZINFO = timezone(-DISPLAY_TZ_OFFSET)
+
+# Se aplica al arrancar. Las agregaciones del dashboard filtran siempre por
+# pais y scraped_at, y sin estos indices cada peticion recorre la coleccion
+# entera. Es idempotente, asi que se puede llamar en cada despliegue.
+INDEXES = [
+    {"pais": 1, "scraped_at": -1},
+    {"scraped_at": -1},
+    {"tendencia": 1},
+]
+
+
+def ensure_indexes():
+    """Crea los indices que necesitan las agregaciones, si no existen."""
+    for keys in INDEXES:
+        db.trends.create_index(keys)
+
+
+def country_filter(pais):
+    """Devuelve el filtro de pais para una agregacion.
+
+    "all", "worldwide" y los valores vacios significan "sin filtro de pais", asi
+    que devuelven un filtro vacio. Antes se hacia {"pais": pais} siempre, lo que
+    hacia que pais="all" buscara un pais llamado literalmente "all" y devolviera
+    vacio siempre, ya que ningun documento se guarda con ese valor.
+    """
+    if not pais or pais in ("all", "worldwide"):
+        return {}
+    return {"pais": pais}
+
+
+def serialize_bucket_timestamp(value):
+    """Convierte el _id de un bucket de $dateTrunc en texto ISO-8601.
+
+    $dateTrunc con timezone devuelve un datetime que YA trae el desplazamiento
+    (-05:00). Anadirle "Z" al final producia "...-05:00Z", que no es una fecha
+    valida: en el front caia en Invalid Date y se rompia el eje del grafico de
+    actividad.
+    """
+    return value.isoformat() if isinstance(value, datetime) else value
+
 
 class Trend:
     """Modelo base para tendencias de Twitter."""
 
     collection = db.trends
-
-    def __init__(self, data: Dict):
-        self.id = data.get("_id")
-        self.fecha = data.get("fecha")
-        self.hora = data.get("hora")
-        self.tendencia = data.get("tendencia")
-        self.numeroDeTwits = data.get("numeroDeTwits")
-        self.pais = data.get("pais")
-        self.scraped_at = data.get("scraped_at")
 
     # ---------- CREACIÓN ----------
 
@@ -26,19 +70,21 @@ class Trend:
         numeroDeTwits: Optional[int] = None,
         pais: str = "worldwide"
     ) -> Dict:
-        now = datetime.now()
+        # scanned_at se guarda en UTC de forma explicita. Antes se usaba
+        # datetime.now(), que es la hora local del servidor: si el servidor
+        # no estaba en UTC el dato quedaba corrido y todas las graficas del
+        # dashboard se desplazaban sin que nada fallara.
+        scraped_at = datetime.now(timezone.utc)
+        local = scraped_at.astimezone(DISPLAY_TZINFO)
+
         return {
-            "fecha": now.strftime("%Y-%m-%d"),
-            "hora": now.strftime("%H:%M:%S"),
+            "fecha": local.strftime("%Y-%m-%d"),
+            "hora": local.strftime("%H:%M:%S"),
             "tendencia": tendencia,
             "numeroDeTwits": numeroDeTwits,
             "pais": pais,
-            "scraped_at": now
+            "scraped_at": scraped_at
         }
-
-    @classmethod
-    def insert_one(cls, document: Dict):
-        return cls.collection.insert_one(document)
 
     # ---------- CONSULTAS BÁSICAS ----------
 
@@ -49,37 +95,6 @@ class Trend:
             cursor = cursor.limit(limit)
         return list(cursor)
 
-    @classmethod
-    def find_by_country(
-        cls,
-        pais: str,
-        limit: Optional[int] = None
-    ) -> List[Dict]:
-        cursor = cls.collection.find(
-            {"pais": pais}
-        ).sort("scraped_at", -1)
-        if limit:
-            cursor = cursor.limit(limit)
-        return list(cursor)
-
-    @classmethod
-    def find_by_date_range(
-        cls,
-        fecha_inicio: str,
-        fecha_fin: str,
-        pais: Optional[str] = None
-    ) -> List[Dict]:
-        query = {
-            "fecha": {"$gte": fecha_inicio, "$lte": fecha_fin}
-        }
-
-        if pais:
-            query["pais"] = pais
-
-        return list(
-            cls.collection.find(query).sort("scraped_at", -1)
-        )
-    
     # ---------- METRICAS PARA EL FRONT ----------
     @classmethod
     def aggregate_activity(cls, pais, dt_from, dt_to, granularity="hour"):
@@ -91,12 +106,13 @@ class Trend:
         if granularity not in ("hour", "day"):
             raise ValueError("granularity debe ser 'hour' o 'day'")
 
+        match = {"scraped_at": {"$gte": dt_from, "$lte": dt_to}}
+
+        match.update(country_filter(pais))
+
         pipeline = [
             {
-                "$match": {
-                    "pais": pais,
-                    "scraped_at": {"$gte": dt_from, "$lte": dt_to}
-                }
+                "$match": match
             },
             {
                 "$group": {
@@ -104,7 +120,7 @@ class Trend:
                         "$dateTrunc": {
                             "date": "$scraped_at", 
                             "unit": granularity,
-                            "timezone": "-05:00"
+                            "timezone": DISPLAY_TZ
                         }
                     },
                     # Agrupamos todos los nombres de tendencias de este bloque temporal
@@ -139,7 +155,12 @@ class Trend:
             # Preparamos el objeto para el frontend
             timestamp_val = r["_id"]
             processed_data.append({
-                "timestamp": timestamp_val.isoformat() + "Z" if isinstance(timestamp_val, datetime) else timestamp_val,
+                # $dateTrunc con timezone devuelve un valor que ya trae el
+                # desplazamiento (-05:00). Anadirle "Z" al final producia
+                # "2026-02-20T15:00:00-05:00Z", que no es una fecha valida:
+                # en el front caia en Invalid Date y se rompia el eje del
+                # grafico de actividad.
+                "timestamp": serialize_bucket_timestamp(timestamp_val),
                 "total_trends_in_period": len(current_trends), # Cuántas había en esa hora
                 "new_trends": new_trends_count                # Cuántas son estrictamente nuevas
             })
@@ -163,8 +184,7 @@ class Trend:
             "scraped_at": {"$gte": dt_from, "$lte": dt_to}
         }
 
-        if pais and pais != "all":
-            match["pais"] = pais
+        match.update(country_filter(pais))
 
         pipeline = [
             {"$match": match},
@@ -173,9 +193,9 @@ class Trend:
                     "time_unit": {
                         # Cambio: Agregamos timezone para definir el bloque de tiempo local
                         "$dateTrunc": {
-                            "date": "$scraped_at",
+                            "date": "$scraped_at", 
                             "unit": granularity,
-                            "timezone": "-05:00"
+                            "timezone": DISPLAY_TZ
                         }
                     }
                 }
@@ -231,7 +251,7 @@ class Trend:
         }
 
         # 1. Identificar tendencias presentes en el país seleccionado
-        filtro_local = {**match_time, "pais": pais} if pais and pais != "all" else match_time
+        filtro_local = {**match_time, **country_filter(pais)}
         tendencias_en_este_pais = cls.collection.distinct("tendencia", filtro_local)
 
         if not tendencias_en_este_pais:
@@ -304,10 +324,10 @@ class Trend:
     @classmethod
     def get_dashboard_summary(cls, pais, dt_from, dt_to, granularity="hour"):
         # 1. Obtenemos las tendencias únicas que aparecen en el país seleccionado
-        filtro_local = {
-            "scraped_at": {"$gte": dt_from, "$lte": dt_to},
-            "pais": pais
-        }
+        filtro_local = {"scraped_at": {"$gte": dt_from, "$lte": dt_to}}
+
+        filtro_local.update(country_filter(pais))
+
         tendencias_en_este_pais = cls.collection.distinct("tendencia", filtro_local)
 
         if not tendencias_en_este_pais:
@@ -369,8 +389,8 @@ class Trend:
         
         # Lógica solicitada: 
         # Si filtramos por un país específico, 'Paises analizados' debería ser ese país (1)
-        # Si es worldwide, debería ser el conteo de todos los países donde hay datos.
-        count_paises = len(paises_reales) if pais == "worldwide" else 1
+        # Si es worldwide o "all", debería ser el conteo de todos los países donde hay datos.
+        count_paises = 1 if country_filter(pais) else len(paises_reales)
 
         return {
             "total_unique": result[0]["total_unicas"],
@@ -398,8 +418,12 @@ class Trend:
             bins = [0, 24, 72, 168]
             labels = ["Efímera (<1d)", "Estable (1-2d)", "Semanal (3-6d)", "Histórica (>=7d)"]
 
+        match = {"scraped_at": {"$gte": dt_from, "$lte": dt_to}}
+
+        match.update(country_filter(pais))
+
         pipeline = [
-            {"$match": {"scraped_at": {"$gte": dt_from, "$lte": dt_to}, "pais": pais}},
+            {"$match": match},
             {
                 "$group": {
                     "_id": {"$trim": {"input": "$tendencia"}},
@@ -409,7 +433,7 @@ class Trend:
                             "$dateTrunc": {
                                 "date": "$scraped_at",
                                 "unit": "hour",
-                                "timezone": "-05:00"
+                                "timezone": DISPLAY_TZ
                             }
                         }
                     }

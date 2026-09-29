@@ -1,8 +1,7 @@
 import os
-import sys
 import logging
+import sys
 from datetime import datetime
-from pathlib import Path 
 import pandas as pd
 from dotenv import load_dotenv 
 
@@ -11,6 +10,10 @@ from scrapy.utils.project import get_project_settings
 
 from modules.scraper import scraper
 from app.crud import save_scraped_trends 
+from app.models import ensure_indexes
+
+# El CSV se rota al llegar a este tamano para que no crezca sin limite.
+CSV_MAX_BYTES = 20 * 1024 * 1024
 
 # ============================================================
 # CONFIG LOGGING
@@ -25,24 +28,33 @@ log = logging.getLogger("Runner")
 # ============================================================
 # CARGA DE VARIABLES DE ENTORNO (.env)
 # ============================================================
-env_path = "/home/ubuntu/scraper/.env"
+# Se resuelve relative al archivo, no a una ruta fija de un servidor,
+# para que funcione igual en local y en el despliegue.
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
 if not load_dotenv(env_path):
-    log.error(f"No se pudo cargar el archivo .env en {env_path}")
+    log.warning(f"No se encontro un archivo .env en {env_path}, se usara el entorno actual")
 else:
     log.info(f".env cargado correctamente desde {env_path}")
-load_dotenv(dotenv_path=env_path)
 
 
 # ============================================================
 # UTILIDADES
 # ============================================================
-def resource_path(relative_path):
-    if hasattr(sys, "_MEIPASS"):  
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
+def rotate_csv_if_needed(output_path):
+    """Rota el CSV cuando supera CSV_MAX_BYTES, conservando una copia."""
+    if not os.path.exists(output_path):
+        return
+    if os.path.getsize(output_path) < CSV_MAX_BYTES:
+        return
+
+    backup = output_path + ".1"
+    if os.path.exists(backup):
+        os.remove(backup)
+    os.replace(output_path, backup)
+    log.warning(
+        f"{output_path} supero {CSV_MAX_BYTES} bytes, se rotó a {backup}"
+    )
 
 
 def save_csv(trends, output_path):
@@ -53,6 +65,8 @@ def save_csv(trends, output_path):
 
     df.insert(0, "fecha", now)
     df.insert(1, "hora", hour)
+
+    rotate_csv_if_needed(output_path)
 
     if os.path.exists(output_path):
         df.to_csv(output_path, mode="a", header=False, index=False)
@@ -85,6 +99,7 @@ def run_scraper(save_to_db=True):
     collected = []
 
     scraper.collected = collected
+    scraper.empty_countries = []
 
     settings = get_project_settings()
     scraper_logger = logging.getLogger("scrapy.core.scraper")
@@ -95,7 +110,7 @@ def run_scraper(save_to_db=True):
     logging.getLogger("scrapy.utils.log").disabled = True
     
     process = CrawlerProcess(settings={
-            "LOG_ENABLED": False,          # 🔥 apaga TODO Scrapy
+            "LOG_ENABLED": False,          # apaga TODO Scrapy
             "TELNETCONSOLE_ENABLED": False,
             "LOG_LEVEL": "WARNING",
             "LOG_SCRAPED_ITEMS": False,
@@ -104,23 +119,45 @@ def run_scraper(save_to_db=True):
         })
 
     process.crawl(scraper)
-    process.start() 
+
+    try:
+        process.start()
+    except Exception:
+        log.exception("El crawler fallo antes de terminar, no se guarda nada")
+        return 1
 
     trends = collected
 
+    if scraper.empty_countries:
+        log.warning(
+            "Paises sin datos: %s. Si son todos, lo mas probable es que "
+            "trends24.in haya cambiado sus clases y el selector "
+            "'div.list-container' ya no coincida.",
+            ", ".join(scraper.empty_countries)
+        )
+
+    # Antes esto solo escribia un warning y salia con codigo 0, de modo que
+    # cron daba el scrape por bueno mientras el dashboard servia datos viejos.
     if not trends:
-        log.warning("No se obtuvieron tendencias.")
-        return
+        log.error(
+            "No se obtuvieron tendencias en ninguna consulta. No se guardo nada."
+        )
+        return 1
 
     if save_to_db:
         db_count = save_to_database(trends)
         if db_count > 0:
             log.info("Datos guardados exitosamente en la base de datos")
+        else:
+            log.error("No se pudo guardar nada en MongoDB")
+            return 1
 
     output_path = os.path.join(os.path.dirname(__file__), "tendencias.csv")
     save_csv(trends, output_path)
 
     log.info("Proceso completado con éxito.")
+    return 0
 
 if __name__ == "__main__":
-    run_scraper()
+    ensure_indexes()
+    sys.exit(run_scraper())

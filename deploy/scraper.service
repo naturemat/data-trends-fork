@@ -1,0 +1,47 @@
+# Unidad systemd del scraper (DataTrendX).
+#
+# Esta unidad vivia unicamente en el servidor: el Jenkinsfile hacia
+# "systemctl restart scraper" pero el archivo no estaba en el repositorio, asi
+# que no habia forma de auditar ni de reproducir como corria en produccion.
+#
+# Instalacion en el servidor:
+#   sudo cp deploy/scraper.service /etc/systemd/system/scraper.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now scraper
+#   sudo systemctl status scraper
+#
+# Rutas asumidas (las mismas que usa el Jenkinsfile):
+#   /var/www/scraper/      codigo desplegado
+#   /var/www/scraper/venv  entorno virtual
+#   /var/www/scraper/.env  variables (MONGODB_URL, GROQCLOUD_API_KEY, ...)
+
+[Unit]
+Description=DataTrendX scraper API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=ubuntu
+WorkingDirectory=/var/www/scraper
+
+# Las variables llegan por aqui. El codigo tambien usa load_dotenv, pero sin
+# sobrescribir lo que ya venga del entorno, asi que systemd tiene prioridad.
+EnvironmentFile=/var/www/scraper/.env
+
+# Threads porque los endpoints de IA hacen llamadas bloqueantes a Groq.
+ExecStart=/var/www/scraper/venv/bin/gunicorn wsgi:app -c gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Endurecimiento
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

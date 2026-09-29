@@ -1,24 +1,44 @@
 import os
-import pytest
-from pymongo import MongoClient
-from dotenv import load_dotenv
 
-# Carga las variables de tu archivo .env
+import pytest
+from dotenv import load_dotenv
+from pymongo import MongoClient
+
+# Carga las variables del archivo .env
 load_dotenv()
 
-def test_mongo_connection():
-    """Prueba de conexión a MongoDB usando la URL del .env"""
-    mongo_uri = os.getenv("MONGODB_URL")
-    print(f"\nProbando conexión a: {mongo_uri}") # Para ver si la lee bien
-    
-    assert mongo_uri is not None, "Error: MONGODB_URL no está en el .env"
 
+def mask_credentials(uri):
+    """Oculta usuario y contrasena de una URI de Mongo.
+
+    La URI lleva la contrasena dentro, asi que registrarla tal cual la
+    escribiria en el log de CI.
+    """
+    if "//" not in uri or "@" not in uri:
+        return uri
+
+    esquema, resto = uri.split("//", 1)
+    credenciales, host = resto.rsplit("@", 1)
+    usuario = credenciales.split(":")[0]
+
+    return esquema + "//" + usuario + ":***@" + host
+
+
+def test_mongo_connection():
+    """Comprueba que MONGODB_URL este definido y que el servidor responda."""
+    mongo_uri = os.getenv("MONGODB_URL")
+    assert mongo_uri is not None, "MONGODB_URL no esta definido en el .env"
+
+    print("\nProbando conexion a: " + mask_credentials(mongo_uri))
+
+    client = None
     try:
-        # Intenta conectar (timeout de 5 segundos para que no se cuelgue)
         client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-        # El comando ping confirma que hay conexión real
-        client.admin.command('ping')
-        print("✅ ¡Conexión Exitosa!")
-        assert True
+        # El comando ping confirma que hay conexion real
+        client.admin.command("ping")
+        print("Conexion exitosa")
     except Exception as e:
-        pytest.fail(f"❌ Falló la conexión a MongoDB: {e}")
+        pytest.fail("Fallo la conexion a MongoDB: " + str(e))
+    finally:
+        if client is not None:
+            client.close()

@@ -1,19 +1,22 @@
-#!/bin/bash
-# Script de inicialización para MongoDB
-# Se ejecuta automáticamente al crear el contenedor
+// Script de inicializacion de MongoDB para la base scraper_db.
+//
+// Este archivo se monta en /docker-entrypoint-initdb.d (ver docker-compose.yml).
+// La imagen oficial de mongo lo ejecuta UNA sola vez, al crear el contenedor
+// vacio, con: mongosh <MONGO_INITDB_DATABASE> <este archivo>.
+//
+// Eso significa que:
+//   - la base de datos ya viene seleccionada, no hay que conectarse a mano
+//   - la autenticacion la resuelve el entrypoint con las credenciales del
+//     contenedor, asi que este archivo NO debe contener usuario ni contrasena
+//   - cuando el volumen ya tiene datos, este script no se vuelve a ejecutar
 
-echo "Inicializando base de datos scraper_db..."
+print("Inicializando la base de datos " + db.getName() + "...");
 
-# Esperar a que MongoDB esté listo
-sleep 10
-
-# Crear colección trends con validación de esquema
-mongosh --host localhost -u admin -p password123 --authenticationDatabase admin scraper_db <<EOF
-
-// Crear colección trends con esquema de validación
+// Coleccion de tendencias con validacion de esquema.
+// Asi se rechaza cualquier documento incompleto en lugar de guardarlo en silencio.
 db.createCollection("trends", {
   validator: {
-    \$jsonSchema: {
+    $jsonSchema: {
       bsonType: "object",
       required: ["fecha", "hora", "tendencia", "numeroDeTwits", "pais", "scraped_at"],
       properties: {
@@ -27,15 +30,15 @@ db.createCollection("trends", {
         },
         tendencia: {
           bsonType: "string",
-          description: "Texto de la tendencia/hashtag"
+          description: "Texto de la tendencia o hashtag"
         },
         numeroDeTwits: {
           bsonType: ["int", "null"],
-          description: "Número de tweets (puede ser null)"
+          description: "Numero de tweets, puede ser null"
         },
         pais: {
           bsonType: "string",
-          description: "País de origen de la tendencia"
+          description: "Pais de origen de la tendencia"
         },
         scraped_at: {
           bsonType: "date",
@@ -46,14 +49,14 @@ db.createCollection("trends", {
   }
 });
 
-// Crear índices para optimizar consultas
+// Indices que soportan las agregaciones de app/models.py
 db.trends.createIndex({ "fecha": 1, "hora": 1 });
 db.trends.createIndex({ "pais": 1 });
 db.trends.createIndex({ "tendencia": 1 });
 db.trends.createIndex({ "scraped_at": -1 });
-db.trends.createIndex({ "pais": 1, "fecha": -1 });
+db.trends.createIndex({ "pais": 1, "scraped_at": -1 });
 
-// Insertar documento de ejemplo
+// Documento de ejemplo, util para levantar el entorno sin scrapear primero
 db.trends.insertOne({
   "fecha": "2025-12-12",
   "hora": "20:30:00",
@@ -63,12 +66,4 @@ db.trends.insertOne({
   "scraped_at": new Date()
 });
 
-print("Base de datos inicializada correctamente");
-print("Colecciones creadas:");
-db.getCollectionNames().forEach(function(collection) {
-  print(" - " + collection);
-});
-
-EOF
-
-echo "Inicialización completada."
+print("Base de datos inicializada. Colecciones: " + db.getCollectionNames().join(", "));
