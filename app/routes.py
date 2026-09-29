@@ -9,7 +9,7 @@ from dateutil import parser
 from flask import Blueprint, request, jsonify, render_template
 from openai import OpenAI
 
-from app.models import Trend
+from app.models import DISPLAY_TZ_OFFSET, Trend
 
 # ---------------------------------------------------------------------
 # Blueprint
@@ -42,6 +42,20 @@ def get_groq_client(env_var):
     return _clients[env_var]
 
 # ---------------------------------------------------------------------
+# Errores
+# ---------------------------------------------------------------------
+def error_response(exc, context, status=500):
+    """Registra el detalle del fallo y devuelve un mensaje generico.
+
+    No se devuelve str(exc) al cliente a proposito: el mensaje de un
+    ServerSelectionTimeoutError de pymongo incluye el host de Mongo, y
+    verificarlo fue suficiente para ver que la topologia interna se filtra.
+    """
+    log.exception(context)
+    return jsonify({"error": "No se pudo completar la solicitud"}), status
+
+
+# ---------------------------------------------------------------------
 # Configuración general
 # ---------------------------------------------------------------------
 API_BASE_URL = os.getenv("API_BASE_URL", "")
@@ -67,8 +81,11 @@ def parse_time_range(req):
     pais = req.args.get("pais", "worldwide")
     date_from_raw = req.args.get("date_from")
     date_to_raw = req.args.get("date_to")
-    
-    offset = timedelta(hours=5)
+
+    # El front manda fechas en hora de Ecuador y Mongo guarda UTC, asi que se
+    # suma el desplazamiento de la zona de display. Ese desplazamiento viene de
+    # app.models para que no pueda descuadrarse del que usan las agregaciones.
+    offset = DISPLAY_TZ_OFFSET
     
     if not date_from_raw or not date_to_raw:
         query = {"pais": pais} if (pais and pais != "all") else {}
@@ -123,7 +140,7 @@ def metrics_activity():
         )
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return error_response(e, "Fallo en /api/metrics/activity", 400)
 
 @routes_blueprint.get("/api/metrics/persistence")
 def persistence_metric():
@@ -135,7 +152,7 @@ def persistence_metric():
         )
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return error_response(e, "Fallo en /api/metrics/persistence", 400)
 
 @routes_blueprint.get("/api/metrics/spread")
 def spread_metric():
@@ -147,7 +164,7 @@ def spread_metric():
         )
         return jsonify({"data": data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return error_response(e, "Fallo en /api/metrics/spread", 400)
 
 # ---------------------------------------------------------------------
 # IA Summary
@@ -199,8 +216,7 @@ def ai_summary():
         # Limpieza extra para asegurar texto plano sin Markdown
         summary = summary.replace("*", "").replace("#", "")
     except Exception as e:
-        log.exception("Error en el endpoint /api/ai_summary")
-        return jsonify({"summary": f"Error en la IA: {str(e)}"}), 500
+        return error_response(e, "Fallo en /api/ai_summary")
 
     return jsonify({"summary": summary})
     
@@ -218,8 +234,7 @@ def get_summary():
         )
         return jsonify(summary)
     except Exception as e:
-        log.exception("Error en el endpoint /api/metrics/summary")
-        return jsonify({"error": str(e)}), 500
+        return error_response(e, "Fallo en /api/metrics/summary")
     
 @routes_blueprint.get("/api/metrics/survival")
 def metrics_survival():
@@ -235,8 +250,7 @@ def metrics_survival():
         )
         return jsonify({"data": data})
     except Exception as e:
-        log.exception("Error en el endpoint /api/metrics/survival")
-        return jsonify({"error": str(e)}), 500
+        return error_response(e, "Fallo en /api/metrics/survival")
     
 # ---------------------------------------------------------------------
 # Clasificación
@@ -290,5 +304,4 @@ def ai_classification():
         return jsonify(classification_json)
 
     except Exception as e:
-        log.exception("Error en el endpoint /api/metrics/ai_classification")
-        return jsonify({"error": str(e)}), 500
+        return error_response(e, "Fallo en /api/metrics/ai_classification")
