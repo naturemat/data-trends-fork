@@ -1,4 +1,11 @@
+import os
+
 import scrapy
+
+COUNTRIES_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), os.pardir, "countries.txt"
+)
+
 
 class scraper(scrapy.Spider):
     name = "trends"
@@ -8,7 +15,7 @@ class scraper(scrapy.Spider):
 
     def start_requests(self):
         # Leer lista de países desde archivo (simple de editar en servidor)
-        with open("countries.txt", "r") as file:
+        with open(COUNTRIES_FILE, "r", encoding="utf-8") as file:
             countries = file.read().splitlines()
 
         for country in countries:
@@ -57,6 +64,7 @@ class scraper(scrapy.Spider):
             clean_rows.append(row) 
             yield row 
             
-        # para modo tipo Instagram-like 
+        # Modo Instagram-like: ademas de yield, se acumulan las filas en la
+        # clase para que main.py pueda guardarlas todas juntas al terminar.
         if scraper.collected is not None: 
             scraper.collected.extend(clean_rows)

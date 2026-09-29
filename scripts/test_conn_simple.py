@@ -1,6 +1,7 @@
 import os
-from pymongo import MongoClient
+
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 # Cargar variables de entorno
 load_dotenv()
@@ -12,6 +13,7 @@ if not mongodb_url:
     print("Error: MONGODB_URL no encontrada en .env")
     exit(1)
 
+
 def test_connection():
     try:
         # Conectar a MongoDB
@@ -20,18 +22,19 @@ def test_connection():
 
         # Ping a la base de datos
         db.command("ping")
-        print("✅ Conexión exitosa a MongoDB")
+        print("Conexion exitosa a MongoDB")
 
-        # Mostrar información
-        print(f"📊 Base de datos: {db.name}")
+        # Mostrar informacion
+        print("Base de datos: " + db.name)
         collections = db.list_collection_names()
-        print(f"📁 Colecciones: {collections}")
+        print("Colecciones: " + str(collections))
 
-        # Cerrar conexión
+        # Cerrar conexion
         client.close()
 
     except Exception as e:
-        print(f"❌ Error de conexión: {e}")
+        print("Error de conexion: " + str(e))
+
 
 if __name__ == "__main__":
     test_connection()

@@ -9,15 +9,6 @@ class Trend:
 
     collection = db.trends
 
-    def __init__(self, data: Dict):
-        self.id = data.get("_id")
-        self.fecha = data.get("fecha")
-        self.hora = data.get("hora")
-        self.tendencia = data.get("tendencia")
-        self.numeroDeTwits = data.get("numeroDeTwits")
-        self.pais = data.get("pais")
-        self.scraped_at = data.get("scraped_at")
-
     # ---------- CREACIÓN ----------
 
     @staticmethod
@@ -36,10 +27,6 @@ class Trend:
             "scraped_at": now
         }
 
-    @classmethod
-    def insert_one(cls, document: Dict):
-        return cls.collection.insert_one(document)
-
     # ---------- CONSULTAS BÁSICAS ----------
 
     @classmethod
@@ -49,37 +36,6 @@ class Trend:
             cursor = cursor.limit(limit)
         return list(cursor)
 
-    @classmethod
-    def find_by_country(
-        cls,
-        pais: str,
-        limit: Optional[int] = None
-    ) -> List[Dict]:
-        cursor = cls.collection.find(
-            {"pais": pais}
-        ).sort("scraped_at", -1)
-        if limit:
-            cursor = cursor.limit(limit)
-        return list(cursor)
-
-    @classmethod
-    def find_by_date_range(
-        cls,
-        fecha_inicio: str,
-        fecha_fin: str,
-        pais: Optional[str] = None
-    ) -> List[Dict]:
-        query = {
-            "fecha": {"$gte": fecha_inicio, "$lte": fecha_fin}
-        }
-
-        if pais:
-            query["pais"] = pais
-
-        return list(
-            cls.collection.find(query).sort("scraped_at", -1)
-        )
-    
     # ---------- METRICAS PARA EL FRONT ----------
     @classmethod
     def aggregate_activity(cls, pais, dt_from, dt_to, granularity="hour"):

@@ -1,8 +1,6 @@
 import os
-import sys
 import logging
 from datetime import datetime
-from pathlib import Path 
 import pandas as pd
 from dotenv import load_dotenv 
 
@@ -25,26 +23,19 @@ log = logging.getLogger("Runner")
 # ============================================================
 # CARGA DE VARIABLES DE ENTORNO (.env)
 # ============================================================
-env_path = "/home/ubuntu/scraper/.env"
+# Se resuelve relative al archivo, no a una ruta fija de un servidor,
+# para que funcione igual en local y en el despliegue.
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
 if not load_dotenv(env_path):
-    log.error(f"No se pudo cargar el archivo .env en {env_path}")
+    log.warning(f"No se encontro un archivo .env en {env_path}, se usara el entorno actual")
 else:
     log.info(f".env cargado correctamente desde {env_path}")
-load_dotenv(dotenv_path=env_path)
 
 
 # ============================================================
 # UTILIDADES
 # ============================================================
-def resource_path(relative_path):
-    if hasattr(sys, "_MEIPASS"):  
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
-
-
 def save_csv(trends, output_path):
     now = datetime.now().strftime("%Y-%m-%d")
     hour = datetime.now().strftime("%H:%M:%S")
@@ -95,7 +86,7 @@ def run_scraper(save_to_db=True):
     logging.getLogger("scrapy.utils.log").disabled = True
     
     process = CrawlerProcess(settings={
-            "LOG_ENABLED": False,          # 🔥 apaga TODO Scrapy
+            "LOG_ENABLED": False,          # apaga TODO Scrapy
             "TELNETCONSOLE_ENABLED": False,
             "LOG_LEVEL": "WARNING",
             "LOG_SCRAPED_ITEMS": False,
