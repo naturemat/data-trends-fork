@@ -12,6 +12,9 @@ class scraper(scrapy.Spider):
     allowed_domains = ["trends24.in"]
 
     collected = None
+    # Paises cuyo HTML no traia el contenedor esperado. Sirve para distinguir
+    # "no hay tendencias" de "trends24.in cambio el marcado".
+    empty_countries = None
 
     def start_requests(self):
         # Leer lista de países desde archivo (simple de editar en servidor)
@@ -35,8 +38,10 @@ class scraper(scrapy.Spider):
     def parse(self, response, country):
 
         first_block = response.css("div.list-container").get()
-        
+
         if not first_block:
+            if scraper.empty_countries is not None:
+                scraper.empty_countries.append(country)
             return
 
         block = response.css("div.list-container")[0]
