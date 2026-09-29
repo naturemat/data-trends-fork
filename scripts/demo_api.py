@@ -1,97 +1,137 @@
 #!/usr/bin/env python3
 """
 Demo script para probar la API de tendencias.
-Ejecutar después de iniciar el servidor Flask.
+Ejecutar despues de iniciar el servidor Flask.
+
+Los endpoints que se consultan son los reales del blueprint de app/routes.py.
+Los que dependen de fechas se piden sin rango, que hace que el backend use el
+dia de la ultima captura almacenada.
 """
 
+import os
+
 import requests
-import json
-from datetime import datetime
 
 BASE_URL = "http://localhost:5000"
 
 
-def test_get_trends():
-    """Prueba obtener tendencias."""
-    print("=== OBTENIENDO TENDENCIAS ===")
-    response = requests.get(f"{BASE_URL}/trends?limit=5")
+def get_and_show(path, label, keys=None):
+    """Consulta un endpoint GET y muestra los campos indicados."""
+    print("=== " + label + " ===")
+    try:
+        response = requests.get(BASE_URL + path, timeout=30)
+    except requests.exceptions.RequestException as e:
+        print("Error de conexion: " + str(e))
+        print()
+        return None
+
+    if response.status_code != 200:
+        print("Error " + str(response.status_code) + ": " + response.text)
+        print()
+        return None
+
+    payload = response.json()
+    if keys:
+        for key in keys:
+            print(key + ": " + str(payload.get(key)))
+    else:
+        data = payload.get("data", payload)
+        if isinstance(data, list):
+            print("Elementos recibidos: " + str(len(data)))
+            for item in data[:3]:
+                print("  " + str(item))
+        else:
+            print(data)
+    print()
+    return payload
+
+
+def test_last_update():
+    """Comprueba que la API responde y cuando fue el ultimo scrape."""
+    return get_and_show("/api/last_update", "ULTIMA ACTUALIZACION", ["last_update"])
+
+
+def test_summary():
+    """Totales del dashboard."""
+    return get_and_show("/api/metrics/summary?pais=worldwide", "RESUMEN", [
+        "total_unique", "total_global", "total_paises",
+    ])
+
+
+def test_persistence():
+    """Top de tendencias mas persistentes."""
+    return get_and_show("/api/metrics/persistence?pais=worldwide", "PERSISTENCIA")
+
+
+def test_activity():
+    """Actividad por intervalo de tiempo."""
+    return get_and_show("/api/metrics/activity?pais=worldwide&granularity=hour", "ACTIVIDAD")
+
+
+def test_spread():
+    """Alcance geografico de las tendencias."""
+    return get_and_show("/api/metrics/spread?pais=worldwide", "ALCANCE")
+
+
+def test_survival():
+    """Distribucion por horas de supervivencia."""
+    return get_and_show("/api/metrics/survival?pais=worldwide", "SUPERVIVENCIA")
+
+
+def test_ai_summary():
+    """Resumen en lenguaje natural generado con Groq.
+
+    Consume la API de IA, se omite con SKIP_AI=1 para no gastar cuota.
+    """
+    print("=== RESUMEN CON IA ===")
+    persistence = get_and_show("/api/metrics/persistence?pais=worldwide", "PERSISTENCIA")
+    if not persistence:
+        return
+
+    trends = persistence.get("data", [])[:15]
+    if not trends:
+        print("No hay tendencias suficientes para generar el resumen")
+        print()
+        return
+
+    try:
+        response = requests.post(
+            BASE_URL + "/api/ai_summary",
+            json={"data": trends, "pais_nombre": "Worldwide"},
+            timeout=120,
+        )
+    except requests.exceptions.RequestException as e:
+        print("Error de conexion: " + str(e))
+        print()
+        return
+
     if response.status_code == 200:
-        trends = response.json()
-        print(f"✓ {len(trends)} tendencias obtenidas")
-        for i, trend in enumerate(trends[:3], 1):
-            print(f"  {i}. {trend.get('hashtag', 'N/A')} - {trend.get('country', 'N/A')}")
+        print(response.json().get("summary", ""))
     else:
-        print(f"✗ Error: {response.status_code}")
-    print()
-
-
-def test_create_trend():
-    """Prueba crear una tendencia."""
-    print("=== CREANDO TENDENCIA MANUAL ===")
-    data = {
-        "tendencia": "#TestTrend",
-        "numeroDeTwits": 1000,
-        "pais": "test"
-    }
-    response = requests.post(f"{BASE_URL}/trends", json=data)
-    if response.status_code == 201:
-        result = response.json()
-        print(f"✓ Tendencia creada: {result}")
-    else:
-        print(f"✗ Error: {response.status_code} - {response.text}")
-    print()
-
-
-def test_bulk_insert():
-    """Prueba insertar múltiples tendencias (como del scraper)."""
-    print("=== INSERTANDO TENDENCIAS A GRANEL ===")
-    trends_data = [
-        {"trend": "#Python", "tweet_count": 5000, "country": "worldwide"},
-        {"trend": "#MongoDB", "tweet_count": 3000, "country": "worldwide"},
-        {"trend": "#Flask", "tweet_count": 2000, "country": "worldwide"}
-    ]
-    response = requests.post(f"{BASE_URL}/trends/bulk", json=trends_data)
-    if response.status_code == 201:
-        result = response.json()
-        print(f"✓ {result.get('message', 'Datos guardados')}")
-    else:
-        print(f"✗ Error: {response.status_code} - {response.text}")
-    print()
-
-
-def test_get_countries():
-    """Prueba obtener países disponibles."""
-    print("=== OBTENIENDO PAÍSES ===")
-    response = requests.get(f"{BASE_URL}/trends/countries")
-    if response.status_code == 200:
-        data = response.json()
-        print(f"✓ Países disponibles: {data.get('countries', [])}")
-    else:
-        print(f"✗ Error: {response.status_code}")
+        print("Error " + str(response.status_code) + ": " + response.text)
     print()
 
 
 def main():
     """Ejecuta todas las pruebas."""
-    print("🚀 DEMO DE LA API DE TENDENCIAS")
-    print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("DEMO DE LA API DE TENDENCIAS")
+    print("Base: " + BASE_URL)
     print("=" * 50)
 
-    try:
-        test_get_trends()
-        test_create_trend()
-        test_bulk_insert()
-        test_get_countries()
+    test_last_update()
+    test_summary()
+    test_persistence()
+    test_activity()
+    test_spread()
+    test_survival()
 
-        print("✅ DEMO COMPLETADA")
-        print("\n💡 Para usar desde el scraper:")
-        print("   python main.py  # Guarda automáticamente en MongoDB + CSV")
+    if os.environ.get("SKIP_AI") != "1":
+        test_ai_summary()
+    else:
+        print("Prueba de IA omitida (SKIP_AI=1)")
 
-    except requests.exceptions.ConnectionError:
-        print("❌ ERROR: No se puede conectar al servidor Flask")
-        print("   Asegúrate de ejecutar: python scripts/run.py")
-    except Exception as e:
-        print(f"❌ ERROR INESPERADO: {e}")
+    print("=" * 50)
+    print("DEMO COMPLETADA")
 
 
 if __name__ == "__main__":
