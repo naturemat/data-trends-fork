@@ -22,9 +22,6 @@ Thumbs.db
 faiss_index.idx
 faiss_metadata.pkl
 
-# Archivos de guia para la integracion con IA
-*.md
-
 #Archivo que almacena las tendencias
 tendencias.csv
 
@@ -33,3 +30,11 @@ temp_deploy/*
 
 # Llaves 
 *.pem
+
+# Respaldos de git y archivos con secretos
+*.bundle
+replacements.txt
+
+# Worktrees y caches de otras herramientas
+.kilo/
+.pytest_cache/

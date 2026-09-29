@@ -10,11 +10,11 @@ load_dotenv(dotenv_path=env_path)
 
 MONGODB_URL = os.getenv("MONGODB_URL")
 
-# Debug: Esto saldrá en tus logs para confirmar la conexión
 if not MONGODB_URL:
-    print("CRITICAL: MONGODB_URL no cargó desde .env, usando fallback...")
-    # Puedes poner tu URL real aquí como último recurso (fallback)
-    MONGODB_URL = "mongodb://Grupo1:passGrupo1@3.151.181.99:27017/scraper_db?authSource=admin"
+    raise RuntimeError(
+        "MONGODB_URL no esta definido. Configuralo en el archivo .env "
+        "(ver .env.example) o exportalo en el entorno antes de arrancar."
+    )
 
 # Cliente MongoDB
 client = MongoClient(MONGODB_URL)
