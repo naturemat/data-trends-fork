@@ -1,33 +1,45 @@
 """Flask route handlers for trends metrics API."""
 
+import json
+import logging
 import os
-from datetime import datetime, timezone, timedelta
-from flask import Blueprint, request, jsonify, render_template
-from app.models import Trend
-from openai import OpenAI
+from datetime import datetime, timedelta
+
 from dateutil import parser
+from flask import Blueprint, request, jsonify, render_template
+from openai import OpenAI
+
+from app.models import Trend
 
 # ---------------------------------------------------------------------
 # Blueprint
 # ---------------------------------------------------------------------
 routes_blueprint = Blueprint("routes", __name__)
 
-# ---------------------------------------------------------------------
-# Configuración IA (Groq / OpenAI compatible)
-# ---------------------------------------------------------------------
-# Se ajusta para que coincida con el nombre en el archivo .env de AWS
-GROQ_API_KEY = os.environ.get("GROQCLOUD_API_KEY")
-GROQ_API_KEY_ALT = os.environ.get("GROQCLOUD_API_KEY_ALT")
+log = logging.getLogger(__name__)
 
-client = OpenAI(
-    api_key=GROQ_API_KEY,
-    base_url="https://api.groq.com/openai/v1",
-)
+# ---------------------------------------------------------------------
+# Configuracion IA (Groq / OpenAI compatible)
+# ---------------------------------------------------------------------
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-client_alt = OpenAI(
-    api_key=GROQ_API_KEY_ALT,
-    base_url="https://api.groq.com/openai/v1",
-)
+_clients = {}
+
+
+def get_groq_client(env_var):
+    """Devuelve un cliente de Groq, creandolo la primera vez que se usa.
+
+    Se construye bajo demanda y no al importar el modulo para que la aplicacion
+    pueda arrancar aunque las llaves de IA no esten configuradas; el error sale
+    solo cuando se llama a un endpoint que si las necesita.
+    """
+    if env_var not in _clients:
+        api_key = os.environ.get(env_var)
+        if not api_key:
+            raise RuntimeError("Falta la variable de entorno " + env_var)
+        _clients[env_var] = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+    return _clients[env_var]
 
 # ---------------------------------------------------------------------
 # Configuración general
@@ -175,8 +187,8 @@ def ai_summary():
     )
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        response = get_groq_client("GROQCLOUD_API_KEY").chat.completions.create(
+            model=GROQ_MODEL,
             messages=[
                 {"role": "system", "content": "Eres un analista de opinión pública y tendencias digitales."},
                 {"role": "user", "content": prompt}
@@ -187,7 +199,7 @@ def ai_summary():
         # Limpieza extra para asegurar texto plano sin Markdown
         summary = summary.replace("*", "").replace("#", "")
     except Exception as e:
-        print(f"Error crítico AI: {e}")
+        log.exception("Error en el endpoint /api/ai_summary")
         return jsonify({"summary": f"Error en la IA: {str(e)}"}), 500
 
     return jsonify({"summary": summary})
@@ -206,7 +218,7 @@ def get_summary():
         )
         return jsonify(summary)
     except Exception as e:
-        print(f"Error en /api/metrics/summary: {e}")
+        log.exception("Error en el endpoint /api/metrics/summary")
         return jsonify({"error": str(e)}), 500
     
 @routes_blueprint.get("/api/metrics/survival")
@@ -223,7 +235,7 @@ def metrics_survival():
         )
         return jsonify({"data": data})
     except Exception as e:
-        print(f"Error en survival: {e}")
+        log.exception("Error en el endpoint /api/metrics/survival")
         return jsonify({"error": str(e)}), 500
     
 # ---------------------------------------------------------------------
@@ -260,9 +272,9 @@ def ai_classification():
             f"LISTA DE TENDENCIAS: {', '.join(trends_list)}"
         )
 
-        # 4. Llamada a Groq con la segunda Key (client_alt)
-        response = client_alt.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        # 4. Llamada a Groq con la segunda llave (GROQCLOUD_API_KEY_ALT)
+        response = get_groq_client("GROQCLOUD_API_KEY_ALT").chat.completions.create(
+            model=GROQ_MODEL,
             messages=[
                 {"role": "system", "content": "Eres un clasificador preciso. Responde solo con el JSON solicitado."},
                 {"role": "user", "content": prompt}
@@ -272,12 +284,11 @@ def ai_classification():
         )
 
         # 5. Parsear y devolver
-        import json
         classification_json = json.loads(response.choices[0].message.content)
 
         # Retornamos el JSON tal cual lo entrega la IA (Categoría -> Lista de Tendencias)
         return jsonify(classification_json)
 
     except Exception as e:
-        print(f"Error en AI Classification: {e}")
+        log.exception("Error en el endpoint /api/metrics/ai_classification")
         return jsonify({"error": str(e)}), 500
